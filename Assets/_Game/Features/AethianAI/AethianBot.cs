@@ -2,6 +2,7 @@ using Homebound.Features.AethianAI.States;
 using UnityEngine;
 using UnityEngine.AI;
 using Homebound.Features.TaskSystem;
+using System;
 
 namespace Homebound.Features.AethianAI
 {
@@ -12,6 +13,8 @@ namespace Homebound.Features.AethianAI
         [Header("Data")] 
         public AethianStats Stats = new AethianStats();
 
+        public event Action<string> OnStateChanged; 
+        
         [Header("Debug")]
         [SerializeField] private string _currentStateName;
         
@@ -31,16 +34,47 @@ namespace Homebound.Features.AethianAI
         protected virtual void Awake()
         {
             Agent = GetComponent<NavMeshAgent>();
-            
-            //Inicializamos los estados
+            if (Agent.enabled) Agent.enabled = false;
+
             StateIdle = new StateIdle(this);
             StateWorking = new StateWorking(this);
             StateSurvival = new StateSurvival(this);
         }
         
-        protected virtual void Start()
+        protected virtual System.Collections.IEnumerator Start()
         {
-            ChangeState(StateIdle);
+            // Desactivamos por seguridad al inicio
+            if (Agent.enabled) Agent.enabled = false;
+
+            // BUCLE DE SEGURIDAD:
+            // Intentamos encontrar el NavMesh hasta 20 veces (2 segundos máx)
+            int intentos = 0;
+            while (intentos < 20)
+            {
+  
+                NavMeshHit hit;
+                if (NavMesh.SamplePosition(transform.position, out hit, 2.0f, NavMesh.AllAreas))
+                {
+
+                    // 1. Ajustamos la posición exacta al suelo válido
+                    transform.position = hit.position;
+                    
+                    // 2. Ahora es seguro encender el agente
+                    Agent.enabled = true;
+                    
+                    Debug.Log($"[AethianBot] Aterrizaje exitoso tras {intentos} intentos. Iniciando IA.");
+                    
+                    // 3. Arrancamos la máquina de estados
+                    ChangeState(StateIdle);
+                    yield break; 
+                }
+
+                // Si no lo encontramos, esperamos un poco y probamos de nuevo
+                yield return new WaitForSeconds(0.1f);
+                intentos++;
+            }
+
+            Debug.LogError($"[AethianBot] CRÍTICO: No se encontró NavMesh debajo de la unidad en {transform.position}. ¿Está el NavMeshSurface bakeado?");
         }
         
         protected virtual void Update()
@@ -55,31 +89,57 @@ namespace Homebound.Features.AethianAI
             _currentState?.Tick();
         }
         
+        //Metodos de Movimiento
+        public void MoveTo(Vector3 position)
+        {
+            if (Agent.isOnNavMesh)
+            {
+                Agent.SetDestination(position);
+                Agent.isStopped = false;
+            }
+        }
+
+        public void StopMoving()
+        {
+            if (Agent.isOnNavMesh)
+            {
+                Agent.isStopped = true;
+                Agent.ResetPath();
+            }
+        }
+
+        public bool HasReachedDestination()
+        {
+            if (!Agent.isOnNavMesh) return false;        
+            
+            if(Agent.pathPending) return false;
+            return Agent.remainingDistance <= Agent.stoppingDistance;
+        }
+        
+        // MEtodos de Gestión de estados
+   
         private void CheckGlobalTransitions()
         {
             //Hook de combate: Si "ShouldIgnoreHunger" es true, no forzamos el survival
             if (!ShouldIgnoreHunger() && Stats.Hunger < AethianStats.HUNGER_CRITICAL_THRESHOLD)
             {
-                if (_currentState != StateSurvival)
-                {
-                    Debug.LogWarning($"[AethianBot] {name} tiene mucha hambre! Forzando modo supervivencia.");
-                    ChangeState(StateSurvival);
-                }
+                ChangeState(StateSurvival);
             }
         }
         
         
         //Metodo virtual para que clases hijas (clases de combate) puedan sobreescribirlo
-        protected virtual bool ShouldIgnoreHunger()
-        {
-            return false; //Por defecto, no ignoramos la hambre
-        }
+        protected virtual bool ShouldIgnoreHunger() => false;
+
 
         public void ChangeState(AethianState newState)
         {
             _currentState?.Exit();
             _currentState = newState;
-            _currentStateName = _currentState.GetType().Name;
+
+            string stateName = _currentState.GetType().Name.Replace("State", "");
+            OnStateChanged?.Invoke(stateName);
+            
             _currentState.Enter();
         }
     }

@@ -4,14 +4,23 @@ namespace Homebound.Features.AethianAI
 {
     public class StateWorking : AethianState
     {
+        //Variables
+        private float _workTimer;
+        private bool _isInteracting;
         public StateWorking(AethianBot bot) : base(bot){}
         
+        
+        
+        //Metodos
         public override void Enter()
         {
+            _isInteracting = false;
+            _workTimer = 0f;
+            
+            
             if (_bot.CurrentJob != null)
             {
-                Debug.Log($"[Aethian] Yendo a trabajar: {_bot.CurrentJob.JobName}");
-                _bot.Agent.SetDestination(_bot.CurrentJob.Position);
+                _bot.MoveTo(_bot.CurrentJob.Position);
             }   
         }
         
@@ -23,12 +32,28 @@ namespace Homebound.Features.AethianAI
                 return;
             }
 
-            if (!_bot.Agent.pathPending && _bot.Agent.remainingDistance <= _bot.Agent.stoppingDistance)
+            if (!_isInteracting)
             {
-                Debug.Log("[Aethian] Trabajo terminado (Simulado)");
-                _bot.CurrentJob = null;
-                _bot.ChangeState(_bot.StateIdle);
+                if (_bot.HasReachedDestination())
+                {
+                    _isInteracting = true;
+                    _bot.StopMoving();
+                }
             }
+            else
+            {
+                _workTimer += Time.deltaTime;
+                if (_workTimer >= 3.0f)
+                {
+                    CompleteJob();
+                }
+            }
+        }
+
+        private void CompleteJob()
+        {
+            _bot.CurrentJob = null;
+            _bot.ChangeState(_bot.StateIdle);
         }
     }
 }
