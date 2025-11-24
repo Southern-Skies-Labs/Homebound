@@ -1,0 +1,19 @@
+{
+    "name": "Homebound.Features.PlayerInteraction",
+    "rootNamespace": "",
+    "references": [
+        "GUID:5751c80b77b10ba49bb150719350653d",
+        "GUID:bad7a62785a6c4c48921129ad96bee43",
+        "GUID:693cf0605a972cc42b537280389179e8",
+        "GUID:75469ad4d38634e559750d17036d5f7c"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
