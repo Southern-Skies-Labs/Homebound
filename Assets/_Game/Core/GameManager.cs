@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using System.Collections.Generic;
 
 
 namespace Homebound.Core
@@ -20,22 +21,18 @@ namespace Homebound.Core
         
         public static GameManager Instance { get; private set; } //Este sería el único Singleton permitido
         
-        public GameState CurrentState { get; private set; } 
-        
+        public GameState CurrentState { get; private set; }
+
+        private List<ITickable> _tickables = new List<ITickable>();
         
         //Metodos
 
         private void Awake()
         {
-            if (Instance != null && Instance != this)
-            {
-                Destroy(gameObject);
-                return;
-            }
+            if (Instance != null && Instance != this) { Destroy(gameObject); return;}
 
             Instance = this;
             DontDestroyOnLoad(gameObject);
-
             InitializeServices();
         }
         
@@ -53,6 +50,36 @@ namespace Homebound.Core
         {
             ChangeState(GameState.Gameplay);
         }
+
+        private void Update()
+        {
+            if (CurrentState == GameState.Gameplay)
+            {
+                float dt = Time.deltaTime;
+
+                for (int i = 0; i < _tickables.Count; i++)
+                {
+                    _tickables[i].Tick(dt);
+                }
+            }
+        }
+
+        public void RegisterTickable(ITickable tickable)
+        {
+            if (!_tickables.Contains(tickable))
+            {
+                _tickables.Add(tickable);
+            }
+        }
+
+        public void UnregisterTickable(ITickable tickable)
+        {
+            if (_tickables.Contains(tickable))
+            {
+                _tickables.Remove(tickable);
+            }
+        }
+
 
         public void ChangeState(GameState newState)
         {
