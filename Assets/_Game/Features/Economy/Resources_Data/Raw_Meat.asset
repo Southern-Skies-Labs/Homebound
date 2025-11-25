@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4846adc0dabfc1f4986393e5f029e18d, type: 3}
   m_Name: Raw_Meat
   m_EditorClassIdentifier: 
-  ID: 
-  DisplayName: 
-  Description: 
-  Icon: {fileID: 0}
+  ID: food_meat_raw
+  DisplayName: Carne Cruda
+  Description: "Peligrosa sin cocinar. Por ahora, no lo es\t"
+  Icon: {fileID: 10913, guid: 0000000000000000f000000000000000, type: 0}
   WorldPrefab: {fileID: 0}
-  Type: 0
+  Type: 1
   MaxStack: 99
-  NutritionValue: 0
+  NutritionValue: 25

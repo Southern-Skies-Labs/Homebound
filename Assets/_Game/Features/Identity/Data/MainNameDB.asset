@@ -12,8 +12,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 41ba9ff0b53b8e3479a19df30627c712, type: 3}
   m_Name: MainNameDB
   m_EditorClassIdentifier: 
-  MaleNames: []
-  FemaleNames: []
-  Surnames: []
+  MaleNames:
+  - Cedric
+  - Torian
+  - Lucian
+  - Eamon
+  - Silas
+  FemaleNames:
+  - Amara
+  - Elin
+  - Lysa
+  - Valora
+  - Kaelen
+  Surnames:
+  - Vane
+  - Thorne
+  - Sterling
+  - Ironwright
+  - Ashdown
   MaleTrodarNames: []
   FemaleTrodarNames: []

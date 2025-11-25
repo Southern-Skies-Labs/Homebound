@@ -12,10 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4846adc0dabfc1f4986393e5f029e18d, type: 3}
   m_Name: Wood
   m_EditorClassIdentifier: 
-  ID: 
-  DisplayName: 
-  Description: 
-  Icon: {fileID: 0}
+  ID: resource_wood
+  DisplayName: Madera
+  Description: "Recurso b\xE1sico de producci\xF3n y construcci\xF3n. Se obtiene
+    de diferentes tipos de \xE1rboles."
+  Icon: {fileID: 10913, guid: 0000000000000000f000000000000000, type: 0}
   WorldPrefab: {fileID: 0}
   Type: 0
   MaxStack: 99

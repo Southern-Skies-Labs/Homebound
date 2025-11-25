@@ -817,6 +817,7 @@ GameObject:
   - component: {fileID: 1442649148}
   - component: {fileID: 1442649150}
   - component: {fileID: 1442649151}
+  - component: {fileID: 1442649152}
   m_Layer: 0
   m_Name: _System
   m_TagString: Untagged
@@ -879,6 +880,19 @@ MonoBehaviour:
   CurrentDay: 1
   CurrentHour: 6
   CurrentSeason: 0
+--- !u!114 &1442649152
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1442649147}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 292ef7f90d41edd4a90d425b539b6fc8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _database: {fileID: 11400000, guid: ecea7b86f31ef1e45a4f79b692f19c21, type: 2}
 --- !u!1 &1764509665
 GameObject:
   m_ObjectHideFlags: 0
