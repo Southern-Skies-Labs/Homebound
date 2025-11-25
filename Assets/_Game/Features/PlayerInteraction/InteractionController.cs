@@ -4,6 +4,7 @@ using UnityEngine.InputSystem;
 using Homebound.Core.Inputs;
 using Homebound.Core;
 using Homebound.Features.TaskSystem;
+using Homebound.Features.Economy;
 
 
 namespace Homebound.Features.PlayerInteraction
@@ -17,8 +18,9 @@ namespace Homebound.Features.PlayerInteraction
         [SerializeField] private Transform _selectionGhost;
         [SerializeField] private GameObject _aethianPrefab;
 
-        [Header("Settings")]
+        [Header("Layers")] 
         [SerializeField] private LayerMask _groundLayer;
+        [SerializeField] private LayerMask _resourceLayer;
         
         
         private RTSInputs _input;
@@ -87,20 +89,42 @@ namespace Homebound.Features.PlayerInteraction
         
         private void OnSelectPerformed(InputAction.CallbackContext context)
         {
-            if(!_isValidHover) return;
-
             var jobManager = ServiceLocator.Get<JobManager>();
-            if (jobManager != null)
+            if (jobManager == null) return;
+
+            
+            Vector2 mouseScreenPos = _input.Gameplay.Point.ReadValue<Vector2>();
+            Ray ray = _mainCamera.ScreenPointToRay(mouseScreenPos);
+
+            // PRIORIDAD 1
+            if (Physics.Raycast(ray, out RaycastHit resourceHit, 1000f, _resourceLayer))
+            {
+                // Intentamos obtener el componente del padre o del objeto golpeado
+                var gatherable = resourceHit.collider.GetComponentInParent<IGatherable>();
+                
+                if (gatherable != null)
+                {
+                    // Crear tarea de recolección
+                    var job = new JobRequest($"Talar {gatherable.Name}", JobType.Chop, gatherable.GetPosition(), gatherable.Transform, 50);
+                    jobManager.PostJob(job);
+                    
+                    Debug.Log($"[Interaction] Árbol marcado para talar: {gatherable.Name}");
+                    return; 
+                }
+            }
+
+            // PRIORIDAD 2
+            if (_isValidHover)
             {
                 Vector3 targetPos = new Vector3(_currentGridPos.x, 1.2f, _currentGridPos.z);
-
-                var job = new JobRequest("Ir a posición", JobType.Haul, targetPos, null, 50);
+                var job = new JobRequest("Ir a Posición", JobType.Haul, targetPos, null, 10); // Bajamos prioridad de mover a 10
                 jobManager.PostJob(job);
-                
-                
-                Debug.Log($"[Interaction] Tarea crada en {targetPos}");
+                Debug.Log($"[Interaction] Tarea de movimiento creada.");
             }
         }
+  
+
+        
 
         private void OnSpawnPerformed(InputAction.CallbackContext context)
         {
