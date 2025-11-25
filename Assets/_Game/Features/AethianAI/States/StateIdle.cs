@@ -23,10 +23,19 @@ namespace Homebound.Features.AethianAI.States
                 var job = jobManager.GetAvailableJob();
                 if (job != null)
                 {
-                     _bot.CurrentJob = job;
-                    _bot.ChangeState(_bot.StateWorking);
+                    _bot.CurrentJob = job;
+                    if (job.JobType == JobType.Chop)
+                    {
+                        _bot.ChangeState(_bot.StateGather);
+                    }
+                    else
+                    {
+                        _bot.ChangeState(_bot.StateWorking);
+                    }
+                
                 }
             }
+
         }
     }
 }

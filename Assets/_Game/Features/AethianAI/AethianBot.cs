@@ -37,6 +37,7 @@ namespace Homebound.Features.AethianAI
         public AethianState StateSurvival { get; private set; }
         
         public AethianState StateSleep { get; private set; }
+        public AethianState StateGather { get; private set; }
         
         //Metodos
         protected virtual void Awake()
@@ -49,6 +50,7 @@ namespace Homebound.Features.AethianAI
             StateWorking = new StateWorking(this);
             StateSurvival = new StateSurvival(this);
             StateSleep = new StateSleep(this);
+            StateGather = new StateGather(this);
         }
         
         protected virtual System.Collections.IEnumerator Start()
