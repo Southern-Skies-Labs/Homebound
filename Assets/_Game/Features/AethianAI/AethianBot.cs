@@ -3,6 +3,8 @@ using UnityEngine;
 using UnityEngine.AI;
 using Homebound.Features.TaskSystem;
 using System;
+using Homebound.Features.TimeSystem;
+using Homebound.Core;
 
 namespace Homebound.Features.AethianAI
 {
@@ -18,6 +20,10 @@ namespace Homebound.Features.AethianAI
         [Header("Debug")]
         [SerializeField] private string _currentStateName;
         
+        private TimeManager _timeManager;
+        private float _lastHourCheck;
+        
+        
         //Componentes
         public NavMeshAgent Agent { get; private set; }
         
@@ -30,63 +36,99 @@ namespace Homebound.Features.AethianAI
         public AethianState StateWorking { get; private set; }
         public AethianState StateSurvival { get; private set; }
         
+        public AethianState StateSleep { get; private set; }
+        
         //Metodos
         protected virtual void Awake()
         {
+          
             Agent = GetComponent<NavMeshAgent>();
             if (Agent.enabled) Agent.enabled = false;
 
             StateIdle = new StateIdle(this);
             StateWorking = new StateWorking(this);
             StateSurvival = new StateSurvival(this);
+            StateSleep = new StateSleep(this);
         }
         
         protected virtual System.Collections.IEnumerator Start()
         {
-            // Desactivamos por seguridad al inicio
+            // --- FASE 1: ATERRIZAJE SEGURO ---
             if (Agent.enabled) Agent.enabled = false;
-
-            // BUCLE DE SEGURIDAD:
-            // Intentamos encontrar el NavMesh hasta 20 veces (2 segundos máx)
+            
+            bool sueloEncontrado = false;
             int intentos = 0;
-            while (intentos < 20)
+
+            while (!sueloEncontrado && intentos < 20)
             {
-  
                 NavMeshHit hit;
+                // Buscamos suelo en un radio de 2 metros
                 if (NavMesh.SamplePosition(transform.position, out hit, 2.0f, NavMesh.AllAreas))
                 {
-
-                    // 1. Ajustamos la posición exacta al suelo válido
                     transform.position = hit.position;
-                    
-                    // 2. Ahora es seguro encender el agente
                     Agent.enabled = true;
-                    
-                    Debug.Log($"[AethianBot] Aterrizaje exitoso tras {intentos} intentos. Iniciando IA.");
-                    
-                    // 3. Arrancamos la máquina de estados
-                    ChangeState(StateIdle);
-                    yield break; 
+                    sueloEncontrado = true;
+                    Debug.Log($"[AethianBot] Aterrizaje exitoso. Unidad lista.");
                 }
-
-                // Si no lo encontramos, esperamos un poco y probamos de nuevo
-                yield return new WaitForSeconds(0.1f);
-                intentos++;
+                else
+                {
+                    // Si no encuentra suelo, espera un poco
+                    yield return new WaitForSeconds(0.1f);
+                    intentos++;
+                }
             }
 
-            Debug.LogError($"[AethianBot] CRÍTICO: No se encontró NavMesh debajo de la unidad en {transform.position}. ¿Está el NavMeshSurface bakeado?");
+            if (!sueloEncontrado)
+            {
+                Debug.LogError($"[AethianBot] CRÍTICO: La unidad {name} no encontró NavMesh y se desactivará.");
+                yield break; // Aquí sí cancelamos porque sin suelo no hay nada que hacer
+            }
+
+            // --- FASE 2: CONEXIÓN AL TIEMPO ---
+            // Ahora que ya estamos en el suelo, buscamos el reloj
+            int timeRetries = 0;
+            while (_timeManager == null && timeRetries < 10)
+            {
+                _timeManager = ServiceLocator.Get<TimeManager>();
+                if (_timeManager == null) yield return new WaitForSeconds(0.1f);
+                timeRetries++;
+            }
+
+            if (_timeManager != null)
+            {
+                _lastHourCheck = _timeManager.CurrentHour;
+                // Debug.Log($"[AethianBot] {name} conectado al sistema de tiempo.");
+            }
+            else
+            {
+                Debug.LogError($"[AethianBot] {name} NO encontró el TimeManager. Sus necesidades no bajarán.");
+            }
+
+            // --- FASE 3: INICIO DE IA ---
+            ChangeState(StateIdle);
         }
         
         protected virtual void Update()
         {
-            //Simulacion de necesidades
-            Stats.DecayHunger(2f * Time.deltaTime);  //Baja 2 puntos por segundo
+            if (_timeManager != null)
+            {
+                float currentHour = _timeManager.CurrentHour;
+                float deltaHours = currentHour - _lastHourCheck;
+                if (deltaHours < 0) deltaHours += 24f; // Ajuste de medianoche
+
+                // Debug para ver si entra aquí
+                // if (deltaHours > 0.1f) Debug.Log($"[AethianBot] Pasaron {deltaHours} horas. Bajando stats.");
+
+                if (deltaHours > 0)
+                {
+                    Stats.UpdateNeeds(deltaHours);
+                    _lastHourCheck = currentHour;
+                }
+            }
             
-            //Check global de supervivencia
             CheckGlobalTransitions();
-            
-            //Ejecutamos la logica del estado actual
             _currentState?.Tick();
+
         }
         
         //Metodos de Movimiento
@@ -118,13 +160,23 @@ namespace Homebound.Features.AethianAI
         
         // MEtodos de Gestión de estados
    
+        // ReSharper disable Unity.PerformanceAnalysis
         private void CheckGlobalTransitions()
         {
-            //Hook de combate: Si "ShouldIgnoreHunger" es true, no forzamos el survival
-            if (!ShouldIgnoreHunger() && Stats.Hunger < AethianStats.HUNGER_CRITICAL_THRESHOLD)
+            if(ShouldIgnoreHunger()) return;
+
+            bool isNight = _timeManager != null && (_timeManager.CurrentHour >= 20 || _timeManager.CurrentHour < 6);
+            if (Stats.Energy.IsCritical() || isNight)
             {
+                ChangeState(StateSleep);
+            }
+
+            if (Stats.Hunger.IsCritical() && !(_currentState is StateSurvival))
+            {
+                Debug.LogWarning($"[Aethian] {name} tiene hambre critica!");
                 ChangeState(StateSurvival);
             }
+
         }
         
         

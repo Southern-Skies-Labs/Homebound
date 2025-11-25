@@ -10,32 +10,23 @@ namespace Homebound.Features.AethianAI
         public string CharacterName = "Aldeano";
         public string Title = "Errante";
         
-        [Header("Life Points")] 
+        [Header("Vitality")] 
         public float Health = 100f;
         public float MaxHealth = 100f;
-
-        [Header("Survival")] 
-        public float Hunger = 100f;
-        public float maxHunger = 100f;
         
-        [Header("Energy")]
-        public float Energy = 100f;
-        public float maxEnergy = 100f;
+        [Header("Needs")]
+        public Need Hunger = new Need("Hambre", 5f);
+        public Need Thirst = new Need("Sed", 8f);
+        public Need Energy = new Need("Energía", 3f);
         
-        //Umbrales de configuración
-        public const float HUNGER_CRITICAL_THRESHOLD = 20f;
-
-        public string GetFullName()
-        {
-            return $"{CharacterName} <{Title}>";
-        }
+        public string GetFullName() => $"{CharacterName} <{Title}>";
 
         // Reduce el hambre con el tiempo, retorna a true si murió de hambre.
-        public bool DecayHunger(float amount)
+        public void UpdateNeeds(float gameHoursPassed)
         {
-            Hunger -= amount;
-            Hunger = Mathf.Clamp(Hunger, 0, maxHunger);
-            return Hunger <= 0;
+            Hunger.Decay(gameHoursPassed);
+            Thirst.Decay(gameHoursPassed);
+            Energy.Decay(gameHoursPassed); 
         }
     }
 }
