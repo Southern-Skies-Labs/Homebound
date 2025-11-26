@@ -1,14 +1,11 @@
 {
-    "name": "Homebound.Features.AethianAI",
+    "name": "Homebound.Features.UI",
     "rootNamespace": "",
     "references": [
         "GUID:5751c80b77b10ba49bb150719350653d",
-        "GUID:bad7a62785a6c4c48921129ad96bee43",
-        "GUID:8c4dd21966739024fbd72155091d199e",
-        "GUID:6055be8ebefd69e48b49212b09b47b2f",
-        "GUID:0ce04a96fd08ff0459d1145694e2fe2f",
         "GUID:458a5e2e26fa2734ba2c46221708b364",
-        "GUID:d3207be544ff6624b935a3a5da6c5f92"
+        "GUID:0ce04a96fd08ff0459d1145694e2fe2f",
+        "GUID:6055be8ebefd69e48b49212b09b47b2f"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

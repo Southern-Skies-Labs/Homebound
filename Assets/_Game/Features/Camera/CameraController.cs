@@ -55,8 +55,12 @@ namespace Homebound.Features.CameraSystem
                 _pitchCurve = new AnimationCurve(new Keyframe(0, 10), new Keyframe(1, 60));
             }
         }
-        
-        private void OnEnable() => _input.Enable();
+
+        private void OnEnable()
+        {
+            _input.Enable();
+            UnityEngine.InputSystem.InputSystem.settings.updateMode = UnityEngine.InputSystem.InputSettings.UpdateMode.ProcessEventsInDynamicUpdate;
+        } 
         private void OnDisable() => _input.Disable();
 
         private void Update()
@@ -85,7 +89,8 @@ namespace Homebound.Features.CameraSystem
 
             if (moveInput.sqrMagnitude > 0.001f)
             {
-                _targetPos += moveDir * _moveSpeed * Time.deltaTime;    
+                Vector3 oldPos = _targetPos;
+                _targetPos += moveDir * _moveSpeed * Time.unscaledDeltaTime;    
             }
             
             
@@ -93,7 +98,7 @@ namespace Homebound.Features.CameraSystem
             float rotInput = _input.Gameplay.Rotate.ReadValue<float>();
             if (MathF.Abs(rotInput)> 0.001f)
             {
-                _targetRot *= Quaternion.Euler(0, rotInput * _rotationSpeed * Time.deltaTime, 0);
+                _targetRot *= Quaternion.Euler(0, rotInput * _rotationSpeed * Time.unscaledDeltaTime, 0);
             }
             
             
@@ -105,21 +110,34 @@ namespace Homebound.Features.CameraSystem
                 _targetZoomDist += zoomDir * _zoomStep;
                 _targetZoomDist = Mathf.Clamp(_targetZoomDist, _minZoomDist, _maxZoomDist);
             }
+
+            // if (Time.timeScale == 0 && moveInput != Vector2.zero)
+            // {
+            //     Debug.Log($"Input Recibido en pausa: {moveInput}");
+            // }
+            
         }
 
         private void MoveRig()
         {
             // Aplicamos movimiento suave al Root
-            _rigRoot.position = Vector3.SmoothDamp(_rigRoot.position, _targetPos, ref _refVelocityPos, _smoothTime);
+            _rigRoot.position = Vector3.SmoothDamp(
+                _rigRoot.position, 
+                _targetPos, 
+                ref _refVelocityPos, 
+                _smoothTime, 
+                Mathf.Infinity,        
+                Time.unscaledDeltaTime 
+            );
             
             // Aplicamos rotacion suave al root
-            _rigRoot.rotation = Quaternion.Slerp(_rigRoot.rotation, _targetRot, Time.deltaTime * 10f);
+            _rigRoot.rotation = Quaternion.Slerp(_rigRoot.rotation, _targetRot, Time.unscaledDeltaTime * 10f);
         }
 
         private void HandleHybridZoom()
         {
             //Componente Lerp del valor numerico del zoom
-            _currentZoomDist = Mathf.Lerp(_currentZoomDist, _targetZoomDist, Time.deltaTime * _zoomDamping);
+            _currentZoomDist = Mathf.Lerp(_currentZoomDist, _targetZoomDist, Time.unscaledDeltaTime * _zoomDamping);
             
             //calculamos el porcentaje de zoom
             float t = Mathf.InverseLerp(_minZoomDist, _maxZoomDist, _currentZoomDist);

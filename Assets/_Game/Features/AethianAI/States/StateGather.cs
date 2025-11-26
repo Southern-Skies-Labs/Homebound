@@ -89,10 +89,12 @@ namespace Homebound.Features.AethianAI
             }
 
             _chopTimer += Time.deltaTime;
-            if (_chopTimer >= CHOP_INTERVAL)
+            while (_chopTimer >= CHOP_INTERVAL)
             {
-                _chopTimer = 0f;
+                _chopTimer -= CHOP_INTERVAL;
                 PerformChopHit();
+
+                if (_currentNode == null || _currentNode.Transform == null) return;
             }
         }
 

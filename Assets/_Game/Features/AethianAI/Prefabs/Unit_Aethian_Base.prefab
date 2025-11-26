@@ -71,14 +71,28 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Stats:
-    CharacterName: Fathunder
-    Title: El Succiona Tentaculos
+    CharacterName: Aethian
+    Title: Aldeano
     Health: 100
     MaxHealth: 100
-    Hunger: 100
-    maxHunger: 100
-    Energy: 100
-    maxEnergy: 100
+    Hunger:
+      Name: Hambre
+      Value: 100
+      MaxValue: 100
+      DecayRate: 5
+      CriticalThreshold: 20
+    Thirst:
+      Name: Sed
+      Value: 100
+      MaxValue: 100
+      DecayRate: 8
+      CriticalThreshold: 20
+    Energy:
+      Name: "Energ\xEDa"
+      Value: 100
+      MaxValue: 100
+      DecayRate: 3
+      CriticalThreshold: 20
   _currentStateName: 
 --- !u!114 &844830244667883707
 MonoBehaviour:

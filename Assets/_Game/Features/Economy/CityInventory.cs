@@ -13,7 +13,8 @@ namespace Homebound.Features.Economy
         //Variable
         [Header("Almacen Global")]
         [SerializeField] private List<InventorySlot> _slots = new List<InventorySlot>();
-        
+
+        public event Action OnInventoryUpdated;
         
         //Metodos
         private void Awake()
@@ -41,6 +42,7 @@ namespace Homebound.Features.Economy
                 _slots.Add(new InventorySlot(item, amount));
             }
 
+            OnInventoryUpdated?.Invoke();
             Debug.Log($"[CityInventory] Añadido {amount} de {item.DisplayName}. Total: {Count(item)}");
             return 0;
         }
@@ -53,6 +55,7 @@ namespace Homebound.Features.Economy
             {
                 slot.Remove(amount);
                 if (slot.IsEmpty) _slots.Remove(slot);
+                OnInventoryUpdated?.Invoke();
                 return true;
             }
             return false;

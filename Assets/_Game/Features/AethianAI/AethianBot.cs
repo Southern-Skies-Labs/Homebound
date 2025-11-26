@@ -5,6 +5,7 @@ using Homebound.Features.TaskSystem;
 using System;
 using Homebound.Features.TimeSystem;
 using Homebound.Core;
+using Homebound.Features.Identity;
 
 namespace Homebound.Features.AethianAI
 {
@@ -106,8 +107,12 @@ namespace Homebound.Features.AethianAI
                 Debug.LogError($"[AethianBot] {name} NO encontró el TimeManager. Sus necesidades no bajarán.");
             }
 
+            AssignRandomIdentity();            
             // --- FASE 3: INICIO DE IA ---
             ChangeState(StateIdle);
+            
+            
+            
         }
         
         protected virtual void Update()
@@ -196,6 +201,30 @@ namespace Homebound.Features.AethianAI
             
             _currentState.Enter();
         }
+        
+        private void AssignRandomIdentity()
+        {
+            if (!string.IsNullOrEmpty(Stats.CharacterName) && Stats.CharacterName != "Aethian") 
+                return;
+
+            var nameService = Homebound.Core.ServiceLocator.Get<NameGeneratorService>();
+            if (nameService != null)
+            {
+                // Aleatorizar género
+                Gender rndGender = (UnityEngine.Random.value > 0.5f) ? Gender.Male : Gender.Female;
+
+                // Asignar nombre
+                Stats.CharacterName = nameService.GetRandomName(Race.Aethian, rndGender);
+
+                // Actualizar UI inmediatamente para que se vea el cambio
+                string stateName = _currentState != null ? _currentState.GetType().Name.Replace("State", "") : "Idle";
+                OnStateChanged?.Invoke(stateName);
+
+                Debug.Log($"[AethianBot] Ha nacido/llegado: {Stats.CharacterName}");
+            }
+        }
+        
+        
     }
 }
 
