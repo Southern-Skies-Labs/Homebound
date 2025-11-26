@@ -5,6 +5,7 @@ using Homebound.Core.Inputs;
 using Homebound.Core;
 using Homebound.Features.TaskSystem;
 using Homebound.Features.Economy;
+using Homebound.Features.AethianAI;
 
 
 
@@ -22,8 +23,9 @@ namespace Homebound.Features.PlayerInteraction
         [Header("Layers")] 
         [SerializeField] private LayerMask _groundLayer;
         [SerializeField] private LayerMask _resourceLayer;
-        
-        
+        [SerializeField] private LayerMask _unitLayer;
+
+        public event Action<AethianBot> OnUnitSelected; 
         private RTSInputs _input;
         private Vector3 _currentGridPos;
         private bool _isValidHover;
@@ -97,6 +99,20 @@ namespace Homebound.Features.PlayerInteraction
             Vector2 mouseScreenPos = _input.Gameplay.Point.ReadValue<Vector2>();
             Ray ray = _mainCamera.ScreenPointToRay(mouseScreenPos);
 
+            //PRIORIDAD 0
+            if (Physics.Raycast(ray, out RaycastHit unitHit, 1000f, _unitLayer))
+            {
+                // Debug.Log($"[RAYCAST] Golpeé Unidad: {unitHit.collider.name}");
+                var bot = unitHit.collider.GetComponentInParent<AethianBot>();
+                if (bot != null)
+                {
+                    Debug.Log($"[Interaction] Unidad seleccionada: {bot.Stats.CharacterName}");
+                    OnUnitSelected?.Invoke(bot);
+                    return;
+                }
+            }
+            
+            
             // PRIORIDAD 1
             if (Physics.Raycast(ray, out RaycastHit resourceHit, 1000f, _resourceLayer))
             {
@@ -109,6 +125,7 @@ namespace Homebound.Features.PlayerInteraction
                     var job = new JobRequest($"Talar {gatherable.Name}", JobType.Chop, gatherable.GetPosition(), gatherable.Transform, 50);
                     jobManager.PostJob(job);
                     
+                    OnUnitSelected?.Invoke(null);
                     Debug.Log($"[Interaction] Árbol marcado para talar: {gatherable.Name}");
                     return; 
                 }
@@ -117,9 +134,13 @@ namespace Homebound.Features.PlayerInteraction
             // PRIORIDAD 2
             if (_isValidHover)
             {
+                // Debug.Log("[RAYCAST] Golpeé Suelo -> Deseleccionando");
+                OnUnitSelected?.Invoke(null);
                 Vector3 targetPos = new Vector3(_currentGridPos.x, 1.2f, _currentGridPos.z);
                 var job = new JobRequest("Ir a Posición", JobType.Haul, targetPos, null, 10); // Bajamos prioridad de mover a 10
                 jobManager.PostJob(job);
+                
+                OnUnitSelected?.Invoke(null);
                 Debug.Log($"[Interaction] Tarea de movimiento creada.");
             }
         }

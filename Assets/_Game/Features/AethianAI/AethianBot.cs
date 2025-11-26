@@ -117,14 +117,16 @@ namespace Homebound.Features.AethianAI
         
         protected virtual void Update()
         {
+            // 1. Metabolismo: Bajar necesidades según el tiempo del juego
             if (_timeManager != null)
             {
                 float currentHour = _timeManager.CurrentHour;
+                
+                // Calculamos cuánto tiempo pasó desde el último frame
                 float deltaHours = currentHour - _lastHourCheck;
-                if (deltaHours < 0) deltaHours += 24f; // Ajuste de medianoche
-
-                // Debug para ver si entra aquí
-                // if (deltaHours > 0.1f) Debug.Log($"[AethianBot] Pasaron {deltaHours} horas. Bajando stats.");
+                
+                // Ajuste por si pasamos de las 23:59 a las 00:00
+                if (deltaHours < 0) deltaHours += 24f; 
 
                 if (deltaHours > 0)
                 {
@@ -133,9 +135,11 @@ namespace Homebound.Features.AethianAI
                 }
             }
             
+            // 2. Transiciones de Estado
             CheckGlobalTransitions();
-            _currentState?.Tick();
 
+            // 3. Ejecutar Estado Actual
+            _currentState?.Tick();
         }
         
         //Metodos de Movimiento

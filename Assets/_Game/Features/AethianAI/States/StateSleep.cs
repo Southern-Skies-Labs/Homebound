@@ -8,7 +8,7 @@ namespace Homebound.Features.AethianAI
         
         public override void Enter()
         {
-            Debug.Log("[Sleep] ZzzZzz... Durmiendo en el suelo");
+            // Debug.Log("[Sleep] ZzzZzz... Durmiendo en el suelo");
             _bot.StopMoving();
         }
         
