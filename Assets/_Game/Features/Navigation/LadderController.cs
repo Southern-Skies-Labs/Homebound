@@ -1,5 +1,6 @@
 using UnityEngine;
 using Unity.AI.Navigation;
+using System.Collections;
 
 namespace Homebound.Features.Navigation
 {
@@ -26,19 +27,28 @@ namespace Homebound.Features.Navigation
             
             //Configuramos el enlace relativo
             _link.startPoint = Vector3.zero;
-            
-            //Punto final relativo
-            _link.endPoint = topPos - bottomPos;
+            _link.endPoint = transform.InverseTransformPoint(topPos);
             
             //Ancho del enlace de 1 voxel
-            _link.width = 1f;
-            
-            //Es para que suban y bajen
+            _link.width = 2f;
+            _link.area = 0;
+            _link.costModifier = -1;
             _link.bidirectional = true;
+            _link.autoUpdate = true;
+
+            StartCoroutine(UpdateLinkRoutine());
+        }
+        
+        private IEnumerator UpdateLinkRoutine()
+        {
+            _link.enabled = false;
+            yield return null;
+            _link.enabled = true;
             
-            //Actualizamos el enlace para que el NavMesh lo reconozca
             _link.UpdateLink();
 
         }
+        
+        
     }
 }

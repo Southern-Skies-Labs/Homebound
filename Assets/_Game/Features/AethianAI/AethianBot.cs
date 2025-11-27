@@ -6,6 +6,7 @@ using System;
 using Homebound.Features.TimeSystem;
 using Homebound.Core;
 using Homebound.Features.Identity;
+using Homebound.Features.Navigation;
 
 namespace Homebound.Features.AethianAI
 {
@@ -20,6 +21,15 @@ namespace Homebound.Features.AethianAI
         
         [Header("Debug")]
         [SerializeField] private string _currentStateName;
+
+        [Header("Anti-Stuck Settings")] 
+        [SerializeField] private GameObject _emergencyLadderPrefab;
+        [SerializeField] private float _stuckThreshold = 2.0f;
+        
+        //Monitoreo 
+        private Vector3 _lastPosition;
+        private float _stuckTimer;
+        private bool _isRecovering;
         
         private TimeManager _timeManager;
         private float _lastHourCheck;
@@ -135,6 +145,9 @@ namespace Homebound.Features.AethianAI
                 }
             }
             
+            //*MONITOR ANTI STUCK*
+            UpdateAntiStuck();
+            
             // 2. Transiciones de Estado
             CheckGlobalTransitions();
 
@@ -226,6 +239,148 @@ namespace Homebound.Features.AethianAI
 
                 Debug.Log($"[AethianBot] Ha nacido/llegado: {Stats.CharacterName}");
             }
+        }
+
+        private void UpdateAntiStuck()
+        {
+            if (_isRecovering || CurrentJob == null) 
+            {
+                _stuckTimer = 0f;
+                return;
+            }
+
+            
+            float distToJob = Vector3.Distance(transform.position, CurrentJob.Position);
+            
+            
+            float distMoved = Vector3.Distance(transform.position, _lastPosition);
+
+            // CONDICIÓN DE ATASCO SIMPLIFICADA:
+            if (distToJob > 2.0f && distMoved < 0.05f * Time.deltaTime)
+            {
+                _stuckTimer += Time.deltaTime;
+                // Debug.Log($"[AntiStuck] Atascado... {_stuckTimer:F1}");
+
+                if (_stuckTimer > _stuckThreshold)
+                {
+                    StartCoroutine(ExecuteEmergencyProtocol());
+                }
+            }
+            else
+            {
+                
+                _stuckTimer = 0f;
+            }
+            
+            _lastPosition = transform.position;
+        }
+        
+        private System.Collections.IEnumerator ExecuteEmergencyProtocol()
+        {
+            _isRecovering = true;
+            Debug.LogWarning($"[AntiStuck] Analizando entorno para solución dinámica...");
+
+            // CONFIGURACIÓN
+            float maxClimbHeight = 10f; 
+            float checkDistance = 1.5f; 
+            LayerMask obstacleLayer = LayerMask.GetMask("Default", "Resource", "Ground"); // Capas que consideramos "Suelo"
+
+            Vector3 startPos = transform.position;
+            Vector3 forward = transform.forward;
+
+           
+            if (Physics.Raycast(startPos + Vector3.up * 0.5f, forward, out RaycastHit wallHit, checkDistance, obstacleLayer))
+            {
+                // 2. ¡Muro detectado! Ahora busquemos su cima.
+                Vector3 skyOrigin = wallHit.point + (forward * 0.6f) + (Vector3.up * maxClimbHeight);
+                
+                // Debug visual para ver desde dónde medimos
+                Debug.DrawRay(skyOrigin, Vector3.down * maxClimbHeight, Color.yellow, 5.0f);
+
+                if (Physics.Raycast(skyOrigin, Vector3.down, out RaycastHit topHit, maxClimbHeight, obstacleLayer))
+                {
+                    // 3. Calcular altura real del obstáculo
+                    float heightDiff = topHit.point.y - startPos.y;
+
+                    
+                    if (heightDiff > 0.5f && heightDiff <= maxClimbHeight)
+                    {
+                        Debug.Log($"[AntiStuck] Solución Dinámica: Obstáculo de {heightDiff:F1}m detectado. Construyendo escalera a medida.");
+                        
+                        //CREACIÓN DE LA ESCALERA DINÁMICA
+                        GameObject ladderObj = Instantiate(_emergencyLadderPrefab);
+                        LadderController ladder = ladderObj.GetComponent<LadderController>();
+
+                        // Posición base: Pegada al bot (o al punto de impacto del muro, un poco atrás)
+                        Vector3 basePos = startPos - (forward * 0.8f); 
+                        
+                        // Posición cima: El punto exacto que encontramos arriba
+                        Vector3 topPos = topHit.point;
+
+                        // Inicializar con los datos calculados
+                        ladder.Initialize(basePos, topPos, LadderType.Emergency, 15f); // 15s de vida
+                        
+                        
+                        var ladderManager = Homebound.Core.ServiceLocator.Get<LadderManager>();
+                        if (ladderManager != null) ladderManager.RegisterLadder(ladder);
+
+                        // Reiniciar NavMeshAgent para que vea el nuevo camino
+                        Agent.ResetPath();
+                        yield return new WaitForSeconds(0.5f); 
+                        
+                       
+                        _isRecovering = false;
+                        _stuckTimer = 0f;
+                        yield break;
+                    }
+                }
+            }
+
+            //PLAN B: Si la solución dinamica no funciona (Muro muy alto o techo), solo entonces usamos el Warp
+            
+            Debug.LogWarning("[AntiStuck] No se encontró solución de escalada viable. Ejecutando Teletransporte.");
+            yield return new WaitForSeconds(1.0f); // Damos un momento de "duda" visual
+
+            GameObject banner = GameObject.FindGameObjectWithTag("Respawn");
+            if (banner != null)
+            {
+                Agent.Warp(banner.transform.position);
+                Agent.ResetPath();
+                ChangeState(StateIdle);
+            }
+            else
+            {
+                // Teletransporte de emergencia local (salto cuántico hacia arriba)
+                Agent.Warp(transform.position + Vector3.up * 3f); 
+            }
+
+            _isRecovering = false;
+            _stuckTimer = 0f;
+        }
+    
+        //Este metodo verifica si es posible llegar al destino antes de intentarlo.
+        public bool IsPathReachable(Vector3 targetPos)
+        {
+            NavMeshPath path = new NavMeshPath();
+            NavMeshHit hit;
+
+            if (NavMesh.SamplePosition(targetPos, out hit, 2.0f, NavMesh.AllAreas))
+            {
+                targetPos = hit.position;
+            }
+            else
+            {
+                return false;
+            }
+            
+            
+            Agent.CalculatePath(targetPos, path);
+            if (path.status == NavMeshPathStatus.PathPartial)
+            {
+                return true;
+            }
+            
+            return path.status == NavMeshPathStatus.PathComplete;
         }
         
         

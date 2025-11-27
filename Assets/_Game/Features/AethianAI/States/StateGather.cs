@@ -43,6 +43,16 @@ namespace Homebound.Features.AethianAI
                 _bot.ChangeState(_bot.StateIdle);
                 return;
             }
+            
+            //Validamos la ruta, si es accesible o no
+            if (!_bot.IsPathReachable(_currentNode.GetPosition()))
+            {
+                Debug.LogWarning($"[StateGather] No puedo llegar al recurso: {_currentNode.Name}. Abortando");
+                _bot.CurrentJob.IsClaimed = false;
+                _bot.CurrentJob = null;
+                _bot.ChangeState(_bot.StateIdle);
+                return;
+            }
 
             _phase = GatherPhase.MovingToNode;
             _bot.MoveTo(_currentNode.GetPosition());

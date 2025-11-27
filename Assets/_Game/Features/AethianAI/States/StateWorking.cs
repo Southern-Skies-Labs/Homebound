@@ -20,6 +20,15 @@ namespace Homebound.Features.AethianAI
             
             if (_bot.CurrentJob != null)
             {
+                if (!_bot.IsPathReachable(_bot.CurrentJob.Position))
+                {
+                    Debug.LogWarning($"[StateWorking] Destino inalcanzable: {_bot.CurrentJob.JobName}. Cancelando tarea");
+                    _bot.CurrentJob.IsClaimed = false;
+                    _bot.CurrentJob = null;
+                    
+                    _bot.ChangeState(_bot.StateIdle);
+                    return;
+                }
                 _bot.MoveTo(_bot.CurrentJob.Position);
             }   
         }

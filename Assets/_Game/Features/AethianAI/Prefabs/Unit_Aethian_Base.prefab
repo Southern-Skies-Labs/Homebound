@@ -94,6 +94,8 @@ MonoBehaviour:
       DecayRate: 3
       CriticalThreshold: 20
   _currentStateName: 
+  _emergencyLadderPrefab: {fileID: 401640293060189693, guid: 52b87bc67be1b0d44be1bc5fdfb31611, type: 3}
+  _stuckThreshold: 2
 --- !u!114 &844830244667883707
 MonoBehaviour:
   m_ObjectHideFlags: 0
