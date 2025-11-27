@@ -332,43 +332,6 @@ namespace Homebound.Features.AethianAI
                     }
                 }
             }
-            else
-            {
-                // INTENTO 2: Bajar (Caída enfrente)
-                Vector3 checkPos = startPos + (forward * 2.0f);
-                // Debug.DrawRay(checkPos + Vector3.up * 0.5f, Vector3.down * maxClimbHeight, Color.cyan, 5.0f);
-
-                if (Physics.Raycast(checkPos + Vector3.up * 0.5f, Vector3.down, out RaycastHit groundHit, maxClimbHeight, obstacleLayer))
-                {
-                    float dropHeight = startPos.y - groundHit.point.y;
-
-                    if (dropHeight > 1.0f && dropHeight <= maxClimbHeight)
-                    {
-                        Debug.Log($"[AntiStuck] Solución Dinámica: Caída de {dropHeight:F1}m detectada. Construyendo escalera hacia abajo.");
-
-                        GameObject ladderObj = Instantiate(_emergencyLadderPrefab);
-                        LadderController ladder = ladderObj.GetComponent<LadderController>();
-
-                        // Posición base: El suelo abajo
-                        Vector3 basePos = groundHit.point;
-
-                        // Posición cima: Enfrente del bot
-                        Vector3 topPos = startPos + (forward * 1.0f);
-
-                        ladder.Initialize(basePos, topPos, LadderType.Emergency, 15f);
-
-                        var ladderManager = Homebound.Core.ServiceLocator.Get<LadderManager>();
-                        if (ladderManager != null) ladderManager.RegisterLadder(ladder);
-
-                        Agent.ResetPath();
-                        yield return new WaitForSeconds(0.5f);
-
-                        _isRecovering = false;
-                        _stuckTimer = 0f;
-                        yield break;
-                    }
-                }
-            }
 
             //PLAN B: Si la solución dinamica no funciona (Muro muy alto o techo), solo entonces usamos el Warp
             

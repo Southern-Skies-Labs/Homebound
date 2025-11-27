@@ -54,7 +54,7 @@ namespace Homebound.Features.Navigation
                 if (ladder.ExpiryTime > 0)
                 {
                     ladder.ExpiryTime -= deltaTime;
-                    if (ladder.ExpiryTime <= 0)
+                    if (ladder.ExpiryTime >= 0)
                     {
                         DestroyLadder(ladder);
                     }
