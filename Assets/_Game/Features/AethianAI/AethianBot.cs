@@ -243,16 +243,13 @@ namespace Homebound.Features.AethianAI
 
         private void UpdateAntiStuck()
         {
-            if (_isRecovering || CurrentJob == null) 
+            if (_isRecovering || CurrentJob == null || !Agent.isOnNavMesh) 
             {
                 _stuckTimer = 0f;
                 return;
             }
-
             
             float distToJob = Vector3.Distance(transform.position, CurrentJob.Position);
-            
-            
             float distMoved = Vector3.Distance(transform.position, _lastPosition);
 
             // CONDICIÓN DE ATASCO SIMPLIFICADA:
@@ -281,8 +278,8 @@ namespace Homebound.Features.AethianAI
             Debug.LogWarning($"[AntiStuck] Analizando entorno para solución dinámica...");
 
             // CONFIGURACIÓN
-            float maxClimbHeight = 10f; 
-            float checkDistance = 1.5f; 
+            float maxClimbHeight = 30f; 
+            float checkDistance = 3.5f; 
             LayerMask obstacleLayer = LayerMask.GetMask("Default", "Resource", "Ground"); // Capas que consideramos "Suelo"
 
             Vector3 startPos = transform.position;
@@ -312,7 +309,7 @@ namespace Homebound.Features.AethianAI
                         LadderController ladder = ladderObj.GetComponent<LadderController>();
 
                         // Posición base: Pegada al bot (o al punto de impacto del muro, un poco atrás)
-                        Vector3 basePos = startPos - (forward * 0.8f); 
+                        Vector3 basePos = startPos - (forward * 1.0f); 
                         
                         // Posición cima: El punto exacto que encontramos arriba
                         Vector3 topPos = topHit.point;

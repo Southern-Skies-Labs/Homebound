@@ -1,6 +1,7 @@
 using UnityEngine;
 using Unity.AI.Navigation;
 using System.Collections;
+using UnityEngine.AI;
 
 namespace Homebound.Features.Navigation
 {
@@ -22,21 +23,34 @@ namespace Homebound.Features.Navigation
             Type = type;
             ExpiryTime = duration;
             
-            //Posicionamos en la base
-            transform.position = bottomPos;
+            //Snapping al Navmesh
+            NavMeshHit hit;
             
-            //Configuramos el enlace relativo
+            //Ajustamos base
+            if (NavMesh.SamplePosition(bottomPos, out hit, 1.0f, NavMesh.AllAreas))
+            {
+                bottomPos = hit.position;
+            }
+            
+            //Ajustamos cima
+            if (NavMesh.SamplePosition(topPos, out hit, 1.0f, NavMesh.AllAreas))
+            {
+                topPos = hit.position;
+            }
+            
+            transform.position = bottomPos;
+            transform.rotation = Quaternion.identity;
+            
             _link.startPoint = Vector3.zero;
             _link.endPoint = transform.InverseTransformPoint(topPos);
-            
-            //Ancho del enlace de 1 voxel
-            _link.width = 2f;
-            _link.area = 0;
+
+            _link.width = 1.5f;
             _link.costModifier = -1;
             _link.bidirectional = true;
             _link.autoUpdate = true;
 
             StartCoroutine(UpdateLinkRoutine());
+
         }
         
         private IEnumerator UpdateLinkRoutine()
