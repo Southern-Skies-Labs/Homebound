@@ -1,0 +1,17 @@
+{
+    "name": "Homebound.Features.Navigation",
+    "rootNamespace": "",
+    "references": [
+        "GUID:5751c80b77b10ba49bb150719350653d",
+        "GUID:8c4dd21966739024fbd72155091d199e"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

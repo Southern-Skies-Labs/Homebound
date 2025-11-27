@@ -67,7 +67,7 @@ namespace Homebound.Features.UI
             {
                 _panelRoot.SetActive(false);
             }
-            Debug.Log($"UI Recibió selección: {(bot != null ? bot.name : "NULL")}");
+            // Debug.Log($"UI Recibió selección: {(bot != null ? bot.name : "NULL")}");
         }
 
         private void RefreshStaticInfo()
