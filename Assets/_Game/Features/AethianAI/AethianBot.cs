@@ -275,68 +275,75 @@ namespace Homebound.Features.AethianAI
         private System.Collections.IEnumerator ExecuteEmergencyProtocol()
         {
             _isRecovering = true;
-            Debug.LogWarning($"[AntiStuck] Analizando entorno para solución dinámica...");
+            Debug.LogWarning($"[AntiStuck] Iniciando protocolos de emergencia...");
 
-            // CONFIGURACIÓN
-            float maxClimbHeight = 30f; 
-            float checkDistance = 3.5f; 
-            LayerMask obstacleLayer = LayerMask.GetMask("Default", "Resource", "Ground"); // Capas que consideramos "Suelo"
+            float maxClimbHeight = 30f;
+            float checkDistance = 2.5f;
+            LayerMask obstacleLayer = LayerMask.GetMask("Default", "Resource", "Ground");
 
             Vector3 startPos = transform.position;
             Vector3 forward = transform.forward;
+            
+            
+            //Verificación 1: La subida o escalada de muros
+            bool wallDetected = Physics.Raycast(startPos + Vector3.up * 0.5f, forward, out RaycastHit wallHit, checkDistance, obstacleLayer);
 
-           
-            if (Physics.Raycast(startPos + Vector3.up * 0.5f, forward, out RaycastHit wallHit, checkDistance, obstacleLayer))
+            if (wallDetected)
             {
-                // 2. ¡Muro detectado! Ahora busquemos su cima.
+                Debug.Log("[AntiStuck] Obstaculo detectado. Evaluando subida...");
                 Vector3 skyOrigin = wallHit.point + (forward * 0.6f) + (Vector3.up * maxClimbHeight);
                 
-                // Debug visual para ver desde dónde medimos
-                Debug.DrawRay(skyOrigin, Vector3.down * maxClimbHeight, Color.yellow, 5.0f);
-
+                
                 if (Physics.Raycast(skyOrigin, Vector3.down, out RaycastHit topHit, maxClimbHeight, obstacleLayer))
                 {
-                    // 3. Calcular altura real del obstáculo
                     float heightDiff = topHit.point.y - startPos.y;
 
-                    
                     if (heightDiff > 0.5f && heightDiff <= maxClimbHeight)
                     {
-                        Debug.Log($"[AntiStuck] Solución Dinámica: Obstáculo de {heightDiff:F1}m detectado. Construyendo escalera a medida.");
+                        Debug.Log($"[AntiStuck] Subida viable encontrada ({heightDiff:F1}m). Construyendo escalera");
                         
-                        //CREACIÓN DE LA ESCALERA DINÁMICA
-                        GameObject ladderObj = Instantiate(_emergencyLadderPrefab);
-                        LadderController ladder = ladderObj.GetComponent<LadderController>();
+                        BuildEmergencyLadder(startPos - (forward * 1.0f), topHit.point);
+                        yield break;
+                    }
 
-                        // Posición base: Pegada al bot (o al punto de impacto del muro, un poco atrás)
-                        Vector3 basePos = startPos - (forward * 1.0f); 
-                        
-                        // Posición cima: El punto exacto que encontramos arriba
-                        Vector3 topPos = topHit.point;
+                }
+                else
+                {
+                    Debug.LogWarning("[AntiStuck] No se encontró techo viable para la escalera.");
+                }
+            }
+            
+            //Verificacion 2: La bajada o descenso de muros
+            Vector3 ledgeCheckPos = startPos + (forward * 1.5f);
 
-                        // Inicializar con los datos calculados
-                        ladder.Initialize(basePos, topPos, LadderType.Emergency, 15f); // 15s de vida
-                        
-                        
-                        var ladderManager = Homebound.Core.ServiceLocator.Get<LadderManager>();
-                        if (ladderManager != null) ladderManager.RegisterLadder(ladder);
+            if (!Physics.Raycast(ledgeCheckPos, Vector3.down, 1.0f, obstacleLayer))
+            {
+                Debug.Log("[AntiStuck] Posible precipicio. Escaneando fondo...");
 
-                        // Reiniciar NavMeshAgent para que vea el nuevo camino
-                        Agent.ResetPath();
-                        yield return new WaitForSeconds(0.5f); 
+                if (Physics.Raycast(ledgeCheckPos, Vector3.down, out RaycastHit groundHit, maxClimbHeight, obstacleLayer))
+                {
+                    float dropHeight = startPos.y - groundHit.point.y;
+                    
+                    //Si la bajada o caída es mayor a 1m, o sea 1 bloque
+                    if (dropHeight > 1.0f)
+                    {
+                        Debug.Log($"[AntiStuck] Bajada viable encontrada ({dropHeight:F1}m). Construyendo escalera.");
+
+                        Vector3 ladderTop = startPos + (forward * 0.2f);
+                        Vector3 ladderBottom = groundHit.point;
+
+                        ladderBottom = new Vector3(ladderTop.x, groundHit.point.y, ladderTop.z);
                         
-                       
-                        _isRecovering = false;
-                        _stuckTimer = 0f;
+                        BuildEmergencyLadder(ladderBottom, ladderTop);
                         yield break;
                     }
                 }
             }
-
-            //PLAN B: Si la solución dinamica no funciona (Muro muy alto o techo), solo entonces usamos el Warp
+            
+            //PLAN B: Si la solución dinamica no funciona (Muro muy alto o techo), solo entonces usamos el Warp. Esto DEBE ser una mecanica de emergencia.
             
             Debug.LogWarning("[AntiStuck] No se encontró solución de escalada viable. Ejecutando Teletransporte.");
-            yield return new WaitForSeconds(1.0f); // Damos un momento de "duda" visual
+            yield return new WaitForSeconds(1.0f); 
 
             GameObject banner = GameObject.FindGameObjectWithTag("Respawn");
             if (banner != null)
@@ -351,6 +358,28 @@ namespace Homebound.Features.AethianAI
                 Agent.Warp(transform.position + Vector3.up * 3f); 
             }
 
+            _isRecovering = false;
+            _stuckTimer = 0f;
+        }
+        
+        private void BuildEmergencyLadder(Vector3 bottom, Vector3 top)
+        {
+            GameObject ladderObj = Instantiate(_emergencyLadderPrefab);
+            LadderController ladder = ladderObj.GetComponent<LadderController>();
+
+            ladder.Initialize(bottom, top, LadderType.Emergency, 15f);
+            
+            var ladderManager = Homebound.Core.ServiceLocator.Get<LadderManager>();
+            if (ladderManager != null) ladderManager.RegisterLadder(ladder);
+
+            StartCoroutine(ResumeMovementRoutine());
+        }
+
+        private System.Collections.IEnumerator ResumeMovementRoutine()
+        {
+            Agent.ResetPath();
+            yield return new WaitForSeconds(0.5f);
+            if (CurrentJob != null) MoveTo(CurrentJob.Position);
             _isRecovering = false;
             _stuckTimer = 0f;
         }
