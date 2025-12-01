@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Homebound.Core;
 
 namespace Homebound.Features.VoxelWorld
 {
@@ -13,6 +14,7 @@ namespace Homebound.Features.VoxelWorld
         private int _width;
         private int _height;
         private int _depth;
+        private Vector3Int _chunkCoordinate;
 
         private BlockType[,,] _blocks;
         private Mesh _mesh;
@@ -22,20 +24,49 @@ namespace Homebound.Features.VoxelWorld
         private List<int> _triangles = new List<int>();
         private List<Color> _colors = new List<Color>();
         
+        private void OnDestroy()
+        {
+            var mapService = ServiceLocator.Get<IVoxelMap>();
+            if (mapService != null)
+            {
+                mapService.UnregisterChunk(_chunkCoordinate);
+            }
+        }
         
         //Metodos
-        public void Initialize(int width, int height, int depth)
+        public void Initialize(int width, int height, int depth, Vector3Int chunkCoord)
         {
             _width = width;
             _height = height;
             _depth = depth;
+            _chunkCoordinate = chunkCoord;
             
             _blocks = new BlockType[width, height, depth];
             _mesh = new Mesh();
             GetComponent<MeshFilter>().mesh = _mesh;
 
+            // Registrarse en el servicio de mapa
+            var mapService = ServiceLocator.Get<IVoxelMap>();
+            if (mapService != null)
+            {
+                mapService.RegisterChunk(chunkCoord, this);
+            }
+            else
+            {
+                Debug.LogWarning("[Chunk] No se encontró VoxelMapService para registrar este chunk.");
+            }
+
             GenerateMapData();
             UpdateMesh();
+        }
+
+        public BlockType GetBlockLocal(int x, int y, int z)
+        {
+            if (x >= 0 && x < _width && y >= 0 && y < _height && z >= 0 && z < _depth)
+            {
+                return _blocks[x, y, z];
+            }
+            return BlockType.Air;
         }
         
         //MapGenerator

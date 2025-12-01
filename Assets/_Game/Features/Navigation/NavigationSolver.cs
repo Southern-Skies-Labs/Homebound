@@ -79,6 +79,10 @@ namespace Homebound.Features.Navigation
                         Vector3 ladderBottom = pointOnWall + (hitInfo.normal * 0.6f); 
                         ladderBottom.y = currentPos.y; 
 
+                        // Refactor Grid: Aseguramos que la base y el tope estén alineados a la rejilla Voxel si es posible
+                        // para que el pathfinder los encuentre fácilmente.
+                        // Sin embargo, LadderController ya hace snap, así que enviamos las posiciones físicas.
+
                         return LadderConstructionRequest.Create(ladderBottom, topHit.point, LadderType.Emergency, 15f);
                     }
                     else

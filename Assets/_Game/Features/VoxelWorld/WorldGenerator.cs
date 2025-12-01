@@ -1,5 +1,5 @@
 using UnityEngine;
-using Unity.AI.Navigation;
+// using Unity.AI.Navigation; // Removing NavMesh dependency
 
 namespace Homebound.Features.VoxelWorld
 {
@@ -8,17 +8,28 @@ namespace Homebound.Features.VoxelWorld
         //Variables
         [Header("Settings")]
         [SerializeField] private int _mapSize = 50;
+        [SerializeField] private int _mapHeight = 5;
         [SerializeField] private Material _voxelMaterial;
 
-        [Header("Navigation")]
-        [SerializeField] private NavMeshSurface _navMeshSurface;
+        // [Header("Navigation")]
+        // [SerializeField] private NavMeshSurface _navMeshSurface;
 
         
         //Metodos
+        private void Awake()
+        {
+            // Inicializamos el servicio de mapa si no existe
+            if (GetComponent<VoxelMapService>() == null)
+            {
+                var service = gameObject.AddComponent<VoxelMapService>();
+                service.Configure(new Vector3Int(_mapSize, 256, _mapSize));
+            }
+        }
+
         private void Start()
         {
             CreateChunk();
-            BakeNavigation();
+            // BakeNavigation(); // Ya no usamos NavMesh
         }
 
         private void CreateChunk()
@@ -44,9 +55,11 @@ namespace Homebound.Features.VoxelWorld
             }
 
             // 5. Inicializar lógica
-            chunk.Initialize(_mapSize, 5, _mapSize);
+            // Enviamos coord (0,0,0) como base
+            chunk.Initialize(_mapSize, _mapHeight, _mapSize, Vector3Int.zero);
         }
 
+        /*
         private void BakeNavigation()
         {
             if (_navMeshSurface != null)
@@ -60,5 +73,6 @@ namespace Homebound.Features.VoxelWorld
                 Debug.LogError("[WorldGenerator] ¡Falta asignar NavMeshSurface en el Inspector!");
             }
         }
+        */
     }
 }

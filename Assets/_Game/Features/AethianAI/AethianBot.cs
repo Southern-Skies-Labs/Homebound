@@ -1,16 +1,17 @@
 using Homebound.Features.AethianAI.States;
 using UnityEngine;
-using UnityEngine.AI;
+// using UnityEngine.AI;
 using Homebound.Features.TaskSystem;
 using System;
 using Homebound.Features.TimeSystem;
 using Homebound.Core;
 using Homebound.Features.Identity;
 using Homebound.Features.Navigation;
+using Homebound.Features.Navigation.Pathfinding;
 
 namespace Homebound.Features.AethianAI
 {
-    [RequireComponent(typeof(NavMeshAgent))]
+    [RequireComponent(typeof(GridMovementAgent))]
     public class AethianBot : MonoBehaviour
     {
         //Variables
@@ -35,7 +36,8 @@ namespace Homebound.Features.AethianAI
         
         
         //Componentes
-        public NavMeshAgent Agent { get; private set; }
+        public GridMovementAgent Agent { get; private set; }
+        private VoxelPathfinder _pathfinder;
         
         //Estado actual
         private AethianState _currentState;
@@ -52,9 +54,10 @@ namespace Homebound.Features.AethianAI
         //Metodos
         protected virtual void Awake()
         {
-          
-            Agent = GetComponent<NavMeshAgent>();
-            if (Agent.enabled) Agent.enabled = false;
+            Agent = GetComponent<GridMovementAgent>();
+            // Buscamos o añadimos el Pathfinder. Idealmente ServiceLocator o Componente
+            _pathfinder = GetComponent<VoxelPathfinder>();
+            if (_pathfinder == null) _pathfinder = gameObject.AddComponent<VoxelPathfinder>();
 
             StateIdle = new StateIdle(this);
             StateWorking = new StateWorking(this);
@@ -66,36 +69,9 @@ namespace Homebound.Features.AethianAI
         protected virtual System.Collections.IEnumerator Start()
         {
             // --- FASE 1: ATERRIZAJE SEGURO ---
-            if (Agent.enabled) Agent.enabled = false;
+            // Simplemente validamos que estamos en un lugar válido del Grid
+            // El CharacterController se encarga del suelo
             
-            bool sueloEncontrado = false;
-            int intentos = 0;
-
-            while (!sueloEncontrado && intentos < 20)
-            {
-                NavMeshHit hit;
-                // Buscamos suelo en un radio de 2 metros
-                if (NavMesh.SamplePosition(transform.position, out hit, 2.0f, NavMesh.AllAreas))
-                {
-                    transform.position = hit.position;
-                    Agent.enabled = true;
-                    sueloEncontrado = true;
-                    Debug.Log($"[AethianBot] Aterrizaje exitoso. Unidad lista.");
-                }
-                else
-                {
-                    // Si no encuentra suelo, espera un poco
-                    yield return new WaitForSeconds(0.1f);
-                    intentos++;
-                }
-            }
-
-            if (!sueloEncontrado)
-            {
-                Debug.LogError($"[AethianBot] CRÍTICO: La unidad {name} no encontró NavMesh y se desactivará.");
-                yield break; // Aquí sí cancelamos porque sin suelo no hay nada que hacer
-            }
-
             // --- FASE 2: CONEXIÓN AL TIEMPO ---
             // Ahora que ya estamos en el suelo, buscamos el reloj
             int timeRetries = 0;
@@ -157,28 +133,27 @@ namespace Homebound.Features.AethianAI
         //Metodos de Movimiento
         public void MoveTo(Vector3 position)
         {
-            if (Agent.isOnNavMesh)
-            {
-                Agent.SetDestination(position);
-                Agent.isStopped = false;
-            }
+             // Solicitamos path y se lo asignamos al agente
+             var path = _pathfinder.FindPath(transform.position, position);
+             if (path != null)
+             {
+                 Agent.SetPath(path);
+             }
+             else
+             {
+                 // Si no hay camino, quizás deberíamos activar anti-stuck inmediatamente o notificar
+                 Debug.LogWarning($"[AethianBot] No se encontró camino hacia {position}");
+             }
         }
 
         public void StopMoving()
         {
-            if (Agent.isOnNavMesh)
-            {
-                Agent.isStopped = true;
-                Agent.ResetPath();
-            }
+            Agent.Stop();
         }
 
         public bool HasReachedDestination()
         {
-            if (!Agent.isOnNavMesh) return false;        
-            
-            if(Agent.pathPending) return false;
-            return Agent.remainingDistance <= Agent.stoppingDistance;
+            return Agent.HasReachedDestination();
         }
         
         // MEtodos de Gestión de estados
@@ -242,7 +217,7 @@ namespace Homebound.Features.AethianAI
 
         private void UpdateAntiStuck()
         {
-            if (_isRecovering || CurrentJob == null || !Agent.isOnNavMesh) 
+            if (_isRecovering || CurrentJob == null)
             {
                 _stuckTimer = 0f;
                 return;
@@ -304,16 +279,23 @@ namespace Homebound.Features.AethianAI
                 yield return new WaitForSeconds(1.0f);
 
                 GameObject banner = GameObject.FindGameObjectWithTag("Respawn");
+                CharacterController cc = Agent.GetComponent<CharacterController>();
+
                 if (banner != null)
                 {
-                    Agent.Warp(banner.transform.position);
-                    Agent.ResetPath();
+                    if(cc) cc.enabled = false;
+                    transform.position = banner.transform.position;
+                    if(cc) cc.enabled = true;
+
+                    Agent.Stop();
                     ChangeState(StateIdle);
                 }
                 else
                 {
                     // Teletransporte de emergencia local (salto cuántico hacia arriba)
-                    Agent.Warp(transform.position + Vector3.up * 3f);
+                    if(cc) cc.enabled = false;
+                    transform.position = transform.position + Vector3.up * 3f;
+                    if(cc) cc.enabled = true;
                 }
             }
 
@@ -324,7 +306,7 @@ namespace Homebound.Features.AethianAI
 
         private System.Collections.IEnumerator ResumeMovementRoutine()
         {
-            Agent.ResetPath();
+            Agent.Stop();
             yield return new WaitForSeconds(0.5f);
             if (CurrentJob != null) MoveTo(CurrentJob.Position);
             _isRecovering = false;
@@ -334,26 +316,9 @@ namespace Homebound.Features.AethianAI
         //Este metodo verifica si es posible llegar al destino antes de intentarlo.
         public bool IsPathReachable(Vector3 targetPos)
         {
-            NavMeshPath path = new NavMeshPath();
-            NavMeshHit hit;
-
-            if (NavMesh.SamplePosition(targetPos, out hit, 2.0f, NavMesh.AllAreas))
-            {
-                targetPos = hit.position;
-            }
-            else
-            {
-                return false;
-            }
-            
-            
-            Agent.CalculatePath(targetPos, path);
-            if (path.status == NavMeshPathStatus.PathPartial)
-            {
-                return true;
-            }
-            
-            return path.status == NavMeshPathStatus.PathComplete;
+             // Usamos el pathfinder para verificar
+             var path = _pathfinder.FindPath(transform.position, targetPos);
+             return path != null && path.Count > 0;
         }
         
         
