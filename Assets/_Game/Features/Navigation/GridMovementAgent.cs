@@ -19,6 +19,15 @@ namespace Homebound.Features.Navigation
         private void Awake()
         {
             _controller = GetComponent<CharacterController>();
+            // Configuración crítica para Voxel World
+            if (_controller != null)
+            {
+                // Permitir subir 1 bloque (1.0f) + un pequeño margen
+                _controller.stepOffset = 1.1f;
+                // Ajustar pendiente para que pueda subir rampas si las hay, o escaleras
+                _controller.slopeLimit = 50f;
+                _controller.minMoveDistance = 0f;
+            }
         }
 
         public void SetPath(List<Vector3> newPath)
@@ -66,20 +75,24 @@ namespace Homebound.Features.Navigation
             }
 
             // Movimiento
-            // Recalculamos dirección completa hacia el objetivo (incluyendo Y para rampas/escalones suaves)
-            // Pero como es Voxel, el CharacterController tiene StepOffset.
-            // Simplemente nos movemos hacia el target.
-
             Vector3 moveDir = (target - transform.position).normalized;
-
-            // Gravedad simple
             Vector3 velocity = moveDir * MoveSpeed;
-            velocity.y += Physics.gravity.y * Time.deltaTime; // Añadir gravedad
 
-            // Como CharacterController.SimpleMove aplica gravedad, Move requiere manual.
-            // Para simplicidad en steps:
-            // Vamos a movernos hacia el punto. Si el punto está arriba, el StepOffset debería encargarse si es pequeño.
-            // Si es un "Salto" (1 bloque), necesitamos que el target esté arriba.
+            // --- Lógica de Escalada vs Gravedad ---
+            // Detectamos si el objetivo requiere subir significativamente (Escaleras)
+            // Si el vector director apunta hacia arriba (> 45 grados aprox), ignoramos gravedad
+            bool isClimbing = moveDir.y > 0.5f;
+
+            if (!isClimbing)
+            {
+                // Solo aplicamos gravedad si no estamos escalando activamente
+                velocity.y += Physics.gravity.y * Time.deltaTime;
+            }
+            else
+            {
+                // Si estamos escalando, aseguramos velocidad vertical constante
+                 // moveDir.y ya tiene componente positiva. Multiplicado por MoveSpeed nos subirá.
+            }
 
             // Ajuste fino: Si estamos muy cerca en XZ del target, pasamos al siguiente
             float distXZ = Vector2.Distance(new Vector2(transform.position.x, transform.position.z), new Vector2(target.x, target.z));
@@ -87,7 +100,7 @@ namespace Homebound.Features.Navigation
             if (distXZ < 0.5f)
             {
                 // Si la altura es diferente, aseguremos que hemos llegado en Y también o que el CC lo maneja
-                if (Mathf.Abs(transform.position.y - target.y) < 1.1f) // Margen de 1 bloque
+                if (Mathf.Abs(transform.position.y - target.y) < 1.2f) // Margen de 1.2 bloque
                 {
                     _currentWaypointIndex++;
                 }
