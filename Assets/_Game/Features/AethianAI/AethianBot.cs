@@ -23,7 +23,6 @@ namespace Homebound.Features.AethianAI
         [SerializeField] private string _currentStateName;
 
         [Header("Anti-Stuck Settings")] 
-        [SerializeField] private GameObject _emergencyLadderPrefab;
         [SerializeField] private float _stuckThreshold = 2.0f;
         
         //Monitoreo 
@@ -277,103 +276,51 @@ namespace Homebound.Features.AethianAI
             _isRecovering = true;
             Debug.LogWarning($"[AntiStuck] Iniciando protocolos de emergencia...");
 
-            float maxClimbHeight = 30f;
-            float checkDistance = 2.5f;
-            LayerMask obstacleLayer = LayerMask.GetMask("Default", "Resource", "Ground");
+            var navSolver = ServiceLocator.Get<NavigationSolver>();
+            bool ladderBuilt = false;
 
-            Vector3 startPos = transform.position;
-            Vector3 forward = transform.forward;
-            
-            
-            //Verificación 1: La subida o escalada de muros
-            bool wallDetected = Physics.Raycast(startPos + Vector3.up * 0.5f, forward, out RaycastHit wallHit, checkDistance, obstacleLayer);
-
-            if (wallDetected)
+            if (navSolver != null && CurrentJob != null)
             {
-                Debug.Log("[AntiStuck] Obstaculo detectado. Evaluando subida...");
-                Vector3 skyOrigin = wallHit.point + (forward * 0.6f) + (Vector3.up * maxClimbHeight);
-                
-                
-                if (Physics.Raycast(skyOrigin, Vector3.down, out RaycastHit topHit, maxClimbHeight, obstacleLayer))
-                {
-                    float heightDiff = topHit.point.y - startPos.y;
+                var solution = navSolver.GetRecoverySolution(transform.position, CurrentJob.Position);
 
-                    if (heightDiff > 0.5f && heightDiff <= maxClimbHeight)
+                if (solution.IsValid)
+                {
+                    var ladderManager = ServiceLocator.Get<LadderManager>();
+                    if (ladderManager != null)
                     {
-                        Debug.Log($"[AntiStuck] Subida viable encontrada ({heightDiff:F1}m). Construyendo escalera");
-                        
-                        BuildEmergencyLadder(startPos - (forward * 1.0f), topHit.point);
+                        ladderManager.BuildLadder(solution);
+                        ladderBuilt = true;
+                        Debug.Log("[AntiStuck] Solución de navegacion encontrada, escalera construida");
+                        StartCoroutine(ResumeMovementRoutine());
                         yield break;
                     }
+                }
+            }
 
+            //PLAN B: Si la solución dinamica no funciona (Muro muy alto o techo), solo entonces usamos el Warp. Esto DEBE ser una mecanica de emergencia.
+            if (!ladderBuilt)
+            {
+                Debug.LogWarning("[AntiStuck] No se encontró solución de escalada viable. Ejecutando Teletransporte.");
+                yield return new WaitForSeconds(1.0f);
+
+                GameObject banner = GameObject.FindGameObjectWithTag("Respawn");
+                if (banner != null)
+                {
+                    Agent.Warp(banner.transform.position);
+                    Agent.ResetPath();
+                    ChangeState(StateIdle);
                 }
                 else
                 {
-                    Debug.LogWarning("[AntiStuck] No se encontró techo viable para la escalera.");
+                    // Teletransporte de emergencia local (salto cuántico hacia arriba)
+                    Agent.Warp(transform.position + Vector3.up * 3f);
                 }
-            }
-            
-            //Verificacion 2: La bajada o descenso de muros
-            Vector3 ledgeCheckPos = startPos + (forward * 1.5f);
-
-            if (!Physics.Raycast(ledgeCheckPos, Vector3.down, 1.0f, obstacleLayer))
-            {
-                Debug.Log("[AntiStuck] Posible precipicio. Escaneando fondo...");
-
-                if (Physics.Raycast(ledgeCheckPos, Vector3.down, out RaycastHit groundHit, maxClimbHeight, obstacleLayer))
-                {
-                    float dropHeight = startPos.y - groundHit.point.y;
-                    
-                    //Si la bajada o caída es mayor a 1m, o sea 1 bloque
-                    if (dropHeight > 1.0f)
-                    {
-                        Debug.Log($"[AntiStuck] Bajada viable encontrada ({dropHeight:F1}m). Construyendo escalera.");
-
-                        Vector3 ladderTop = startPos + (forward * 0.2f);
-                        Vector3 ladderBottom = groundHit.point;
-
-                        ladderBottom = new Vector3(ladderTop.x, groundHit.point.y, ladderTop.z);
-                        
-                        BuildEmergencyLadder(ladderBottom, ladderTop);
-                        yield break;
-                    }
-                }
-            }
-            
-            //PLAN B: Si la solución dinamica no funciona (Muro muy alto o techo), solo entonces usamos el Warp. Esto DEBE ser una mecanica de emergencia.
-            
-            Debug.LogWarning("[AntiStuck] No se encontró solución de escalada viable. Ejecutando Teletransporte.");
-            yield return new WaitForSeconds(1.0f); 
-
-            GameObject banner = GameObject.FindGameObjectWithTag("Respawn");
-            if (banner != null)
-            {
-                Agent.Warp(banner.transform.position);
-                Agent.ResetPath();
-                ChangeState(StateIdle);
-            }
-            else
-            {
-                // Teletransporte de emergencia local (salto cuántico hacia arriba)
-                Agent.Warp(transform.position + Vector3.up * 3f); 
             }
 
             _isRecovering = false;
             _stuckTimer = 0f;
         }
         
-        private void BuildEmergencyLadder(Vector3 bottom, Vector3 top)
-        {
-            GameObject ladderObj = Instantiate(_emergencyLadderPrefab);
-            LadderController ladder = ladderObj.GetComponent<LadderController>();
-
-            ladder.Initialize(bottom, top, LadderType.Emergency, 15f);
-            
-            var ladderManager = Homebound.Core.ServiceLocator.Get<LadderManager>();
-            if (ladderManager != null) ladderManager.RegisterLadder(ladder);
-
-            StartCoroutine(ResumeMovementRoutine());
-        }
 
         private System.Collections.IEnumerator ResumeMovementRoutine()
         {

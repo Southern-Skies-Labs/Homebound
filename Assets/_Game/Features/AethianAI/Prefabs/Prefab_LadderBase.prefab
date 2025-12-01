@@ -73,6 +73,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Type: 1
   ExpiryTime: -1
+  _link: {fileID: 5172215588197315164}
+  visualMesh: {fileID: 0}
 --- !u!1 &5583099753227965316
 GameObject:
   m_ObjectHideFlags: 0

@@ -7,6 +7,7 @@ namespace Homebound.Features.Navigation
 {
     public class LadderManager : MonoBehaviour, ITickable
     {
+        [SerializeField] private GameObject _ladderPrefab;
         private List<LadderController> _activeLadders = new List<LadderController>();
         
         //Metodos
@@ -29,6 +30,22 @@ namespace Homebound.Features.Navigation
         }
         
         // API Publica
+        public void BuildLadder(LadderConstructionRequest request)
+        {
+            if(!request.IsValid || _ladderPrefab == null) return;
+
+            GameObject ladderObj = Instantiate(_ladderPrefab);
+            LadderController ladder = ladderObj.GetComponent<LadderController>();
+
+            if (ladder != null)
+            {
+                ladder.Initialize(request.BottomPosition, request.TopPosition, request.Type, request.Duration);
+                RegisterLadder(ladder);
+            }
+        }
+        
+        
+        
         public void RegisterLadder(LadderController ladder)
         {
             if (!_activeLadders.Contains(ladder))
