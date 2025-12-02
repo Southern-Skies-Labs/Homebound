@@ -1,5 +1,7 @@
 using UnityEngine;
-using Unity.AI.Navigation;
+// using Unity.AI.Navigation;
+using Homebound.Core;
+using Homebound.Features.Navigation;
 
 namespace Homebound.Features.VoxelWorld
 {
@@ -10,15 +12,25 @@ namespace Homebound.Features.VoxelWorld
         [SerializeField] private int _mapSize = 50;
         [SerializeField] private Material _voxelMaterial;
 
-        [Header("Navigation")]
-        [SerializeField] private NavMeshSurface _navMeshSurface;
-
         
         //Metodos
         private void Start()
         {
+            InitializeNavigationGrid();
             CreateChunk();
-            BakeNavigation();
+        }
+        
+        private void InitializeNavigationGrid()
+        {
+            var gridManager = ServiceLocator.Get<GridManager>();
+            if (gridManager != null)
+            {
+                gridManager.InitializeGrid(_mapSize, 20, _mapSize);
+            }
+            else
+            {
+                Debug.LogError("[WorldGenerator] GridManager no encontrado.");
+            }
         }
 
         private void CreateChunk()
@@ -45,20 +57,6 @@ namespace Homebound.Features.VoxelWorld
 
             // 5. Inicializar lógica
             chunk.Initialize(_mapSize, 5, _mapSize);
-        }
-
-        private void BakeNavigation()
-        {
-            if (_navMeshSurface != null)
-            {
-                // Reconstruir NavMesh en tiempo de ejecución
-                _navMeshSurface.BuildNavMesh();
-                Debug.Log("[WorldGenerator] NavMesh construido exitosamente.");
-            }
-            else
-            {
-                Debug.LogError("[WorldGenerator] ¡Falta asignar NavMeshSurface en el Inspector!");
-            }
         }
     }
 }

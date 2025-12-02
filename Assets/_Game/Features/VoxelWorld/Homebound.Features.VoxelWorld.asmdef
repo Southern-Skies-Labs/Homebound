@@ -1,0 +1,17 @@
+{
+    "name": "Homebound.Features.VoxelWorld",
+    "rootNamespace": "",
+    "references": [
+        "GUID:5751c80b77b10ba49bb150719350653d",
+        "GUID:7a08a9d3b4ffc2d4fbdfe9ee4c3c80e9"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
