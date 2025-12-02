@@ -2,24 +2,40 @@ using System;
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using Homebound.Core;
-using NUnit.Framework;
 
 namespace Homebound.Features.Economy
 {
     public class CityInventory : MonoBehaviour, IInventory
     {
-        //Variable
+        
+        //Variables
         [Header("Almacen Global")]
         [SerializeField] private List<InventorySlot> _slots = new List<InventorySlot>();
 
         public event Action OnInventoryUpdated;
         
+        
         //Metodos
         private void Awake()
         {
             ServiceLocator.Register<CityInventory>(this);
+        }
+        
+        private void Start()
+        {
+            // --- DEBUG / CHEAT DE INICIO ---
+            // Le regalamos 50 de cada item posible para probar la construcción
+            Debug.LogWarning("💰 [DEBUG] CityInventory: Añadiendo recursos iniciales de prueba.");
+            
+            // Busca todos los ItemData en tu carpeta de recursos (Resources_Data)
+            // Asegúrate de que tus ScriptableObjects estén en una carpeta dentro de Resources si usas Resources.Load
+            // O mejor, arrástralos en una lista en el inspector si prefieres.
+            
+            // FORMA RÁPIDA (Si tienes la lista _slots visible en inspector):
+            // Simplemente añade manualmente en el Inspector del objeto _System -> CityInventory
+            // Elemento 0: Item: Stone, Cantidad: 50.
+            // Elemento 1: Item: Dirt, Cantidad: 50.
         }
 
         private void OnDestroy()
@@ -27,7 +43,7 @@ namespace Homebound.Features.Economy
             ServiceLocator.Unregister<CityInventory>();
         }
         
-        //Implementaciónm del IInventory
+        
 
         public int Add(ItemData item, int amount)
         {
@@ -43,13 +59,14 @@ namespace Homebound.Features.Economy
             }
 
             OnInventoryUpdated?.Invoke();
-            Debug.Log($"[CityInventory] Añadido {amount} de {item.DisplayName}. Total: {Count(item)}");
-            return 0;
+            // Debug.Log($"[CityInventory] Añadido {amount} de {item.DisplayName}.");
+            return 0; 
         }
 
         public bool Remove(ItemData item, int amount)
         {
             if (!Has(item, amount)) return false;
+            
             var slot = _slots.FirstOrDefault(s => s.Item == item);
             if (slot != null)
             {
@@ -66,6 +83,20 @@ namespace Homebound.Features.Economy
             return Count(item) >= amount;
         }
 
+        
+        public bool HasItem(ItemData item, int amount) => Has(item, amount);
+
+        
+        public bool TryConsume(ItemData item, int amount)
+        {
+            if (Has(item, amount))
+            {
+                Remove(item, amount);
+                return true;
+            }
+            return false;
+        }
+
         public int Count(ItemData item)
         {
             var slot = _slots.FirstOrDefault(s => s.Item == item);
@@ -73,4 +104,3 @@ namespace Homebound.Features.Economy
         }
     }
 }
-

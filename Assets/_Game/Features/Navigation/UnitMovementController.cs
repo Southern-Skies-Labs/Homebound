@@ -26,17 +26,28 @@ namespace Homebound.Features.Navigation
 
         public void MoveTo(Vector3 targetPosition)
         {
+           if (_pathfindingService == null)
+            {
+                _pathfindingService = ServiceLocator.Get<PathfindingService>();
+            }
+            
+            if (_pathfindingService == null)
+            {
+                Debug.LogError($"[UnitMovement] CRASH EVITADO: No se encontró PathfindingService.");
+                return;
+            }
+            // --------------------------------------
+
             List<Vector3> path = _pathfindingService.FindPath(transform.position, targetPosition);
 
             if (path != null && path.Count > 0)
             {
-                StopMoving();
+                StopMoving(); 
                 _currentMoveCoroutine = StartCoroutine(FollowPath(path));
             }
             else
             {
-                IsMoving = false;
-                Debug.LogWarning($"[UnitMovement] No se encontró ruta para el movimiento {targetPosition}.");
+                IsMoving = false; 
             }
         }
         

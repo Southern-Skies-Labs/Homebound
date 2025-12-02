@@ -10,33 +10,42 @@ namespace Homebound.Features.AethianAI.States
         
         public override void Enter()
         {
-         //Detenemos movimiento
-         _bot.StopMoving();
+            
+            _bot.StopMoving();
         }
         
         public override void Tick()
         {
-            //Si tenemos hambre, el Aethianbot forzara el cambio a survival
+            
             var jobManager = ServiceLocator.Get<JobManager>();
             if (jobManager != null)
             {
                 var job = jobManager.GetAvailableJob();
+                
                 if (job != null)
                 {
+                    
                     _bot.CurrentJob = job;
-                    if (job.JobType == JobType.Chop)
+
+                    
+                    switch (job.JobType)
                     {
-                        _bot.ChangeState(_bot.StateGather);
+                        case JobType.Chop:
+                            _bot.ChangeState(_bot.StateGather);
+                            break;
+
+                        case JobType.Build:
+                            
+                            _bot.ChangeState(_bot.StateBuilding); 
+                            break;
+
+                        default:
+                            
+                            _bot.ChangeState(_bot.StateWorking);
+                            break;
                     }
-                    else
-                    {
-                        _bot.ChangeState(_bot.StateWorking);
-                    }
-                
                 }
             }
-
         }
     }
 }
-

@@ -30,6 +30,7 @@ namespace Homebound.Features.AethianAI
         public JobRequest CurrentJob { get; set; } 
         
         // Estados
+        public AethianState StateBuilding { get; private set; }
         public AethianState StateIdle { get; private set; }
         public AethianState StateWorking { get; private set; }
         public AethianState StateSurvival { get; private set; }
@@ -49,6 +50,7 @@ namespace Homebound.Features.AethianAI
             StateSurvival = new StateSurvival(this);
             StateSleep = new StateSleep(this);
             StateGather = new StateGather(this);
+            StateBuilding = new StateBuilding(this);
         }
         
         protected virtual System.Collections.IEnumerator Start()

@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 5097804699326598958}
   - component: {fileID: 2114080935237573765}
   - component: {fileID: 6742398072245370737}
-  - component: {fileID: 5063108309969575063}
+  - component: {fileID: -2184671763897165481}
   m_Layer: 0
   m_Name: Construction_Site_Prefab
   m_TagString: Untagged
@@ -87,7 +87,7 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!114 &5063108309969575063
+--- !u!114 &-2184671763897165481
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -100,4 +100,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _blueprint: {fileID: 0}
+  _maxWorkers: 4
+  _completionParticles: {fileID: 0}
+  _blockCosts:
+  - Block: 2
+    Item: {fileID: 11400000, guid: a7540fe3ceb74fb4da1762b2f41d636d, type: 2}
   _currentPhase: 0
