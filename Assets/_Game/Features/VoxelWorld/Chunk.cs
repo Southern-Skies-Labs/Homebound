@@ -26,6 +26,7 @@ namespace Homebound.Features.VoxelWorld
         private List<Color> _colors = new List<Color>();
         
         
+        
         //Metodos
         public void Initialize(int width, int height, int depth)
         {
