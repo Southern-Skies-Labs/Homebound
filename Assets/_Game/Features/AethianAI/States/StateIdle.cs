@@ -11,7 +11,7 @@ namespace Homebound.Features.AethianAI.States
         public override void Enter()
         {
          //Detenemos movimiento
-         if(_bot.Agent.isOnNavMesh) _bot.Agent.ResetPath();
+         _bot.StopMoving();
         }
         
         public override void Tick()

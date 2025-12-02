@@ -9,10 +9,10 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7516664325783929563}
-  - component: {fileID: 581120805511084370}
-  - component: {fileID: 6691252521131654893}
   - component: {fileID: 844830244667883707}
   - component: {fileID: 132296009371854640}
+  - component: {fileID: -4212531190173567245}
+  - component: {fileID: 8238417413627897938}
   m_Layer: 3
   m_Name: Unit_Aethian_Base
   m_TagString: Untagged
@@ -36,64 +36,6 @@ Transform:
   - {fileID: 4995283357906045870}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!195 &581120805511084370
-NavMeshAgent:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1675548140487814534}
-  m_Enabled: 0
-  m_AgentTypeID: -1372625422
-  m_Radius: 0.3
-  m_Speed: 3.5
-  m_Acceleration: 8
-  avoidancePriority: 50
-  m_AngularSpeed: 120
-  m_StoppingDistance: 0
-  m_AutoTraverseOffMeshLink: 1
-  m_AutoBraking: 1
-  m_AutoRepath: 1
-  m_Height: 1.8
-  m_BaseOffset: 0
-  m_WalkableMask: 4294967295
-  m_ObstacleAvoidanceType: 4
---- !u!114 &6691252521131654893
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1675548140487814534}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8f82a03ce69c0a342892c6518bb0fab6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  Stats:
-    CharacterName: Aethian
-    Title: Aldeano
-    Health: 100
-    MaxHealth: 100
-    Hunger:
-      Name: Hambre
-      Value: 100
-      MaxValue: 100
-      DecayRate: 5
-      CriticalThreshold: 20
-    Thirst:
-      Name: Sed
-      Value: 100
-      MaxValue: 100
-      DecayRate: 8
-      CriticalThreshold: 20
-    Energy:
-      Name: "Energ\xEDa"
-      Value: 100
-      MaxValue: 100
-      DecayRate: 3
-      CriticalThreshold: 20
-  _currentStateName: 
 --- !u!114 &844830244667883707
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -129,6 +71,56 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 2, z: 1}
   m_Center: {x: 0, y: 1, z: 0}
+--- !u!114 &-4212531190173567245
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675548140487814534}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d2e47e4244dcc284292897dd7494da96, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _moveSpeed: 4
+  _rotationSpeed: 10
+--- !u!114 &8238417413627897938
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675548140487814534}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f82a03ce69c0a342892c6518bb0fab6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Stats:
+    CharacterName: Aldeano
+    Title: Errante
+    Health: 100
+    MaxHealth: 100
+    Hunger:
+      Name: Hambre
+      Value: 100
+      MaxValue: 100
+      DecayRate: 5
+      CriticalThreshold: 20
+    Thirst:
+      Name: Sed
+      Value: 100
+      MaxValue: 100
+      DecayRate: 8
+      CriticalThreshold: 20
+    Energy:
+      Name: "Energ\xEDa"
+      Value: 100
+      MaxValue: 100
+      DecayRate: 3
+      CriticalThreshold: 20
+  _currentStateName: 
 --- !u!1 &6058328310388587398
 GameObject:
   m_ObjectHideFlags: 0
