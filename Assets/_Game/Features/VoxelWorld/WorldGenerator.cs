@@ -1,5 +1,4 @@
 using UnityEngine;
-// using Unity.AI.Navigation;
 using Homebound.Core;
 using Homebound.Features.Navigation;
 
@@ -10,13 +9,14 @@ namespace Homebound.Features.VoxelWorld
         //Variables
         [Header("Settings")]
         [SerializeField] private int _mapSize = 50;
-        [SerializeField] private Material _voxelMaterial;
+        [SerializeField] private int _mapHeight = 20;
+        [SerializeField] private Chunk _chunkPrefab;
 
         
         //Metodos
         private void Start()
         {
-            InitializeNavigationGrid();
+            // InitializeNavigationGrid();
             CreateChunk();
         }
         
@@ -35,28 +35,16 @@ namespace Homebound.Features.VoxelWorld
 
         private void CreateChunk()
         {
-            // 1. Crear objeto vacío
-            GameObject chunkObj = new GameObject("World_Chunk_0_0");
-            chunkObj.transform.parent = this.transform;
-            
-            // 2. Añadir script Chunk. 
-            Chunk chunk = chunkObj.AddComponent<Chunk>();
-            
-            // 3. OBTENER (No añadir) el renderer que se creó automáticamente
-            var renderer = chunkObj.GetComponent<MeshRenderer>();
-            
-            // 4. Verificación de seguridad antes de asignar material
-            if (_voxelMaterial != null)
+            // Buscamos el Chunk en la escena (asumiendo que hay uno hijo o en el objeto World)
+            Chunk chunk = GetComponentInChildren<Chunk>();
+            if (chunk == null)
             {
-                renderer.material = _voxelMaterial;
-            }
-            else
-            {
-                Debug.LogError("[WorldGenerator] ¡Falta asignar el Material Voxel en el Inspector!");
+                Debug.LogError("No se encontró componente Chunk en WorldGenerator o hijos.");
+                return;
             }
 
-            // 5. Inicializar lógica
-            chunk.Initialize(_mapSize, 5, _mapSize);
+            // Inicializamos con el tamaño deseado
+            chunk.Initialize(_mapSize, _mapHeight, _mapSize);
         }
     }
 }

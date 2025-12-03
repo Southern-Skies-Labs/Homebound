@@ -1,158 +1,151 @@
-using System;
-using System.Collections.Generic;
-using Homebound.Features.Navigation;
 using UnityEngine;
-using Homebound.Core;
+using System.Collections.Generic;
+using Homebound.Features.VoxelWorld;
 
 namespace Homebound.Features.VoxelWorld
 {
-    [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider))]
+    [RequireComponent(typeof(MeshFilter))]
+    [RequireComponent(typeof(MeshRenderer))]
+    [RequireComponent(typeof(MeshCollider))]
     public class Chunk : MonoBehaviour
     {
-        //Variables
-        
-        //Tamaño del chunk
-        private int _width;
-        private int _height;
-        private int _depth;
+        [Header("Configuración de Generación")]
+        [SerializeField] private int _width = 50;
+        [SerializeField] private int _height = 30;
+        [SerializeField] private float _noiseScale = 0.03f;
+        [SerializeField] private float _heightMultiplier = 15f;
 
         private BlockType[,,] _blocks;
         private Mesh _mesh;
-        private GridManager _gridManager;
-        
-        //Listas para generar la Mesh
         private List<Vector3> _vertices = new List<Vector3>();
         private List<int> _triangles = new List<int>();
         private List<Color> _colors = new List<Color>();
-        
-        
-        
-        //Metodos
+
+        private int _xOffset;
+        private int _zOffset;
+
         public void Initialize(int width, int height, int depth)
         {
             _width = width;
             _height = height;
-            _depth = depth;
             
-            _blocks = new BlockType[width, height, depth];
+            _xOffset = _width / 2;
+            _zOffset = width / 2;
+
+            _blocks = new BlockType[_width, _height, width];
+            
             _mesh = new Mesh();
-            GetComponent<MeshFilter>().mesh = _mesh;
+            // Permite mapas grandes (>65k vértices)
+            _mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32; 
             
-            _gridManager = ServiceLocator.Get<GridManager>();
+            GetComponent<MeshFilter>().mesh = _mesh;
+            gameObject.layer = LayerMask.NameToLayer("Terrain");
 
             GenerateMapData();
-            UpdateMesh();
+            CreateMeshData();
         }
-        
-        //MapGenerator
+
         private void GenerateMapData()
         {
             for (int x = 0; x < _width; x++)
             {
-                for (int z = 0; z < _depth; z++)
+                for (int z = 0; z < _width; z++)
                 {
+                    float worldX = transform.position.x + (x - _xOffset); 
+                    float worldZ = transform.position.z + (z - _zOffset);
+
+                    int terrainHeight = Mathf.FloorToInt(Mathf.PerlinNoise(worldX * _noiseScale, worldZ * _noiseScale) * _heightMultiplier) + 5;
+
                     for (int y = 0; y < _height; y++)
                     {
-                        // Generación básica
-                        if (y == 0)
+                        if (y < terrainHeight)
                         {
-                            _blocks[x, y, z] = BlockType.Dirt;
-  
-                            NotifyGridUpdate(x, y, z, true); 
+                            if (y == terrainHeight - 1) _blocks[x, y, z] = BlockType.Stone; // Pasto
+                            else _blocks[x, y, z] = BlockType.Dirt; // Tierra
                         }
                         else
                         {
                             _blocks[x, y, z] = BlockType.Air;
- 
-                            NotifyGridUpdate(x, y, z, false);
                         }
                     }
                 }
             }
         }
-        
-        private void NotifyGridUpdate(int x, int y, int z, bool isSolid)
+
+        private void CreateMeshData()
         {
-            if (_gridManager != null)
+            _vertices.Clear();
+            _triangles.Clear();
+            _colors.Clear();
+
+            for (int x = 0; x < _width; x++)
             {
-                _gridManager.UpdateNode(x, y, z, isSolid);
-            }
-        }
-        
-    //MeshGenerator que convierte los datos en 3D
-    private void UpdateMesh()
-    {
-        _vertices.Clear();
-        _triangles.Clear();
-        _colors.Clear();
-        
-        for (int x = 0; x < _width; x++)
-        {
-            for (int y = 0; y < _height; y++)
-            {
-                for (int z = 0; z < _depth; z++)
+                for (int z = 0; z < _width; z++)
                 {
-                    if (_blocks[x, y, z] != BlockType.Air)
+                    for (int y = 0; y < _height; y++)
                     {
-                        AddVoxelDataToChunk(new Vector3Int(x, y, z));
-                    } 
+                        if (_blocks[x, y, z] != BlockType.Air)
+                        {
+                            AddVoxelDataToChunk(x, y, z);
+                        }
+                    }
                 }
             }
-        } 
-        
-        _mesh.Clear();
-        _mesh.vertices = _vertices.ToArray();
-        _mesh.triangles = _triangles.ToArray();
-        _mesh.colors = _colors.ToArray();
-        
-        _mesh.RecalculateNormals();
-        
-        //Asignamos el colisionador
-        GetComponent<MeshCollider>().sharedMesh = _mesh;
-    }
-    
-    private void AddVoxelDataToChunk(Vector3Int pos)
-    {
-        //Primero revisamos las 6 caras
-        for (int p = 0; p < 6; p++)
+
+            _mesh.Clear();
+            _mesh.vertices = _vertices.ToArray();
+            _mesh.triangles = _triangles.ToArray();
+            _mesh.colors = _colors.ToArray();
+            
+            _mesh.RecalculateNormals();
+            
+            GetComponent<MeshCollider>().sharedMesh = _mesh;
+        }
+
+        private void AddVoxelDataToChunk(int x, int y, int z)
         {
-            if (!IsVoxelHidden(pos + VoxelData.FaceChecks[p]))
+            for (int p = 0; p < 6; p++)
             {
-                //Si la cara está visible, añadimos los 4 vertices
-                int vertCount = _vertices.Count;
-                
-                _vertices.Add(pos + VoxelData.VoxelVerts[VoxelData.VoxelTris[p, 0]]);
-                _vertices.Add(pos + VoxelData.VoxelVerts[VoxelData.VoxelTris[p, 1]]);
-                _vertices.Add(pos + VoxelData.VoxelVerts[VoxelData.VoxelTris[p, 2]]);
-                _vertices.Add(pos + VoxelData.VoxelVerts[VoxelData.VoxelTris[p, 3]]);
-                
-                //Añadimos un color 
-                Color voxelColor = new Color(0.5f, 0.3f, 0.1f);
-                _colors.Add(voxelColor);
-                _colors.Add(voxelColor);
-                _colors.Add(voxelColor);
-                _colors.Add(voxelColor);
-                
-                //Creamos los 2 triangulos
-                _triangles.Add(vertCount);
-                _triangles.Add(vertCount + 1);
-                _triangles.Add(vertCount + 2);
-                _triangles.Add(vertCount + 2);
-                _triangles.Add(vertCount + 1);
-                _triangles.Add(vertCount + 3);
+                if (!CheckVoxel(x + VoxelData.FaceChecks[p].x, y + VoxelData.FaceChecks[p].y, z + VoxelData.FaceChecks[p].z))
+                {
+                    Color voxelColor = Color.white;
+                    // Definición de colores (Ajusta los números si quieres tonos distintos)
+                    if (_blocks[x,y,z] == BlockType.Dirt) voxelColor = new Color(0.54f, 0.27f, 0.07f); // Marrón
+                    else if (_blocks[x,y,z] == BlockType.Stone) voxelColor = new Color(0.13f, 0.54f, 0.13f); // Verde
+
+                    // Añadimos los 4 vértices de la cara
+                    for (int i = 0; i < 4; i++)
+                    {
+                        int triangleIndex = VoxelData.VoxelTris[p, i];
+                        Vector3 pos = VoxelData.VoxelVerts[triangleIndex] + new Vector3(x - _xOffset, y, z - _zOffset);
+                        _vertices.Add(pos);
+                        _colors.Add(voxelColor);
+                    }
+
+                    int vertCount = _vertices.Count;
+
+                    // --- CORRECCIÓN DE TRIÁNGULOS (TOPOLOGÍA QUAD) ---
+                    // Triángulo 1: (0, 1, 2) -> Esquina, Arriba, Derecha
+                    _triangles.Add(vertCount - 4);
+                    _triangles.Add(vertCount - 3);
+                    _triangles.Add(vertCount - 2);
+
+                    // Triángulo 2: (2, 1, 3) -> Derecha, Arriba, Opuesto
+                    // Esta es la combinación que cierra el cuadrado perfectamente sin invertir la normal
+                    _triangles.Add(vertCount - 2);
+                    _triangles.Add(vertCount - 3);
+                    _triangles.Add(vertCount - 1);
+                    // ------------------------------------------------
+                }
             }
         }
-    } 
-    
-        private bool IsVoxelHidden(Vector3Int pos)
+
+        private bool CheckVoxel(int x, int y, int z)
         {
-            //Si está fuera de los límites del chunk, asumimos que no está oculto y dibujamos el borde
-            if (pos.x < 0 || pos.x >= _width || pos.y < 0 || pos.y >= _height || pos.z < 0 || pos.z >= _depth)
+            if (x < 0 || x >= _width || y < 0 || y >= _height || z < 0 || z >= _width)
                 return false;
-            
-            //Si el vecino es solido, la cara estará oculta
-            return _blocks[pos.x, pos.y, pos.z] != BlockType.Air;
+
+            return _blocks[x, y, z] != BlockType.Air;
         }
     }
 }
-
