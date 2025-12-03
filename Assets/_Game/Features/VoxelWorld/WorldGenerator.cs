@@ -35,7 +35,6 @@ namespace Homebound.Features.VoxelWorld
 
         private void CreateChunk()
         {
-            // Buscamos el Chunk en la escena (asumiendo que hay uno hijo o en el objeto World)
             Chunk chunk = GetComponentInChildren<Chunk>();
             if (chunk == null)
             {
@@ -43,7 +42,7 @@ namespace Homebound.Features.VoxelWorld
                 return;
             }
 
-            // Inicializamos con el tamaño deseado
+            
             chunk.Initialize(_mapSize, _mapHeight, _mapSize);
         }
     }

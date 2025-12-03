@@ -9,34 +9,37 @@ namespace Homebound.Features.VoxelWorld
     [RequireComponent(typeof(MeshCollider))]
     public class Chunk : MonoBehaviour
     {
-        [Header("Configuración de Generación")]
+        [Header("Generación")]
         [SerializeField] private int _width = 50;
         [SerializeField] private int _height = 30;
         [SerializeField] private float _noiseScale = 0.03f;
         [SerializeField] private float _heightMultiplier = 15f;
 
+        [Header("Probabilidad de Minerales (0-1)")]
+        [SerializeField] private float _coalChance = 0.05f;   // 5%
+        [SerializeField] private float _copperChance = 0.03f; // 3%
+        [SerializeField] private float _goldChance = 0.01f;   // 1%
+
+        // Datos
         private BlockType[,,] _blocks;
         private Mesh _mesh;
+        
+        // Listas de Malla
         private List<Vector3> _vertices = new List<Vector3>();
         private List<int> _triangles = new List<int>();
-        private List<Color> _colors = new List<Color>();
+        private List<Vector2> _uvs = new List<Vector2>(); 
 
         private int _xOffset;
         private int _zOffset;
 
         public void Initialize(int width, int height, int depth)
         {
-            _width = width;
-            _height = height;
-            
-            _xOffset = _width / 2;
-            _zOffset = width / 2;
-
+            _width = width; _height = height;
+            _xOffset = _width / 2; _zOffset = width / 2;
             _blocks = new BlockType[_width, _height, width];
             
             _mesh = new Mesh();
-            // Permite mapas grandes (>65k vértices)
-            _mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32; 
+            _mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             
             GetComponent<MeshFilter>().mesh = _mesh;
             gameObject.layer = LayerMask.NameToLayer("Terrain");
@@ -51,17 +54,47 @@ namespace Homebound.Features.VoxelWorld
             {
                 for (int z = 0; z < _width; z++)
                 {
+                    // Posición global para que el ruido sea coherente
                     float worldX = transform.position.x + (x - _xOffset); 
                     float worldZ = transform.position.z + (z - _zOffset);
 
+                    // Altura del terreno base
                     int terrainHeight = Mathf.FloorToInt(Mathf.PerlinNoise(worldX * _noiseScale, worldZ * _noiseScale) * _heightMultiplier) + 5;
 
                     for (int y = 0; y < _height; y++)
                     {
-                        if (y < terrainHeight)
+                        if (y == 0) 
                         {
-                            if (y == terrainHeight - 1) _blocks[x, y, z] = BlockType.Stone; // Pasto
-                            else _blocks[x, y, z] = BlockType.Dirt; // Tierra
+                            _blocks[x, y, z] = BlockType.Bedrock; // Fondo irrompible
+                        }
+                        else if (y < terrainHeight)
+                        {
+                            // Superficie
+                            if (y == terrainHeight - 1) 
+                            {
+                                _blocks[x, y, z] = BlockType.Grass; 
+                            }
+                            // Subsuelo inmediato (Tierra)
+                            else if (y > terrainHeight - 4) 
+                            {
+                                _blocks[x, y, z] = BlockType.Dirt;
+                            }
+                            // Profundidad (Piedra y Minerales)
+                            else 
+                            {
+                                // Lógica Procedural de Minerales (Simple Probabilidad 3D)
+                                // Usamos un ruido 3D simple o Random determinista basado en coordenadas
+                                float oreNoise = Mathf.PerlinNoise(worldX * 0.1f + y * 0.5f, worldZ * 0.1f);
+                                
+                                // Podríamos usar Random.value para dispersión pura, o ruido para vetas.
+                                // Usaremos Random con Seed para determinismo local simple por ahora.
+                                float rng = Random.value; 
+                                
+                                if (rng < _goldChance && y < 10) _blocks[x, y, z] = BlockType.Gold; // Oro solo profundo
+                                else if (rng < _copperChance) _blocks[x, y, z] = BlockType.Copper;
+                                else if (rng < _coalChance) _blocks[x, y, z] = BlockType.Coal;
+                                else _blocks[x, y, z] = BlockType.Stone;
+                            }
                         }
                         else
                         {
@@ -76,7 +109,7 @@ namespace Homebound.Features.VoxelWorld
         {
             _vertices.Clear();
             _triangles.Clear();
-            _colors.Clear();
+            _uvs.Clear(); 
 
             for (int x = 0; x < _width; x++)
             {
@@ -95,56 +128,67 @@ namespace Homebound.Features.VoxelWorld
             _mesh.Clear();
             _mesh.vertices = _vertices.ToArray();
             _mesh.triangles = _triangles.ToArray();
-            _mesh.colors = _colors.ToArray();
+            _mesh.uv = _uvs.ToArray(); // Asignamos UVs
             
             _mesh.RecalculateNormals();
-            
             GetComponent<MeshCollider>().sharedMesh = _mesh;
         }
 
         private void AddVoxelDataToChunk(int x, int y, int z)
         {
+            BlockType type = _blocks[x, y, z];
+            Vector2[] uvs = VoxelData.GetUVs(type); 
+
             for (int p = 0; p < 6; p++)
             {
                 if (!CheckVoxel(x + VoxelData.FaceChecks[p].x, y + VoxelData.FaceChecks[p].y, z + VoxelData.FaceChecks[p].z))
                 {
-                    Color voxelColor = Color.white;
-                    // Definición de colores (Ajusta los números si quieres tonos distintos)
-                    if (_blocks[x,y,z] == BlockType.Dirt) voxelColor = new Color(0.54f, 0.27f, 0.07f); // Marrón
-                    else if (_blocks[x,y,z] == BlockType.Stone) voxelColor = new Color(0.13f, 0.54f, 0.13f); // Verde
-
-                    // Añadimos los 4 vértices de la cara
                     for (int i = 0; i < 4; i++)
                     {
                         int triangleIndex = VoxelData.VoxelTris[p, i];
                         Vector3 pos = VoxelData.VoxelVerts[triangleIndex] + new Vector3(x - _xOffset, y, z - _zOffset);
                         _vertices.Add(pos);
-                        _colors.Add(voxelColor);
+                        
+                        // Mapeo UV estándar para cada cara (0,0 -> 0,1 -> 1,1 -> 1,0)
+                        // Aquí necesitamos mapear los 4 vértices del Quad a las 4 esquinas del UV que nos devolvió VoxelData
+                        // Orden de VoxelTris: 0, 1, 2, 3 (Bl, Br, Tr, Tl) -> Depende de tu definición exacta de Tris
+                        
+                        // Simplificación para Quad UVs:
+                        // Asumimos que VoxelData.GetUVs devuelve [BL, TL, TR, BR] o similar.
+                        // Ajustaremos esto visualmente:
+                        if(i == 0) _uvs.Add(uvs[0]); // 0,0
+                        if(i == 1) _uvs.Add(uvs[3]); // 1,0
+                        if(i == 2) _uvs.Add(uvs[1]); // 0,1
+                        if(i == 3) _uvs.Add(uvs[2]); // 1,1
+                        // Nota: El orden exacto puede requerir prueba y error según como rote la textura, 
+                        // pero esto asigna una esquina de la textura a cada vértice.
                     }
 
                     int vertCount = _vertices.Count;
 
-                    // --- CORRECCIÓN DE TRIÁNGULOS (TOPOLOGÍA QUAD) ---
                     // Triángulo 1: (0, 1, 2) -> Esquina, Arriba, Derecha
+
                     _triangles.Add(vertCount - 4);
+
                     _triangles.Add(vertCount - 3);
+
                     _triangles.Add(vertCount - 2);
 
+
                     // Triángulo 2: (2, 1, 3) -> Derecha, Arriba, Opuesto
-                    // Esta es la combinación que cierra el cuadrado perfectamente sin invertir la normal
+
                     _triangles.Add(vertCount - 2);
+
                     _triangles.Add(vertCount - 3);
+
                     _triangles.Add(vertCount - 1);
-                    // ------------------------------------------------
                 }
             }
         }
 
         private bool CheckVoxel(int x, int y, int z)
         {
-            if (x < 0 || x >= _width || y < 0 || y >= _height || z < 0 || z >= _width)
-                return false;
-
+            if (x < 0 || x >= _width || y < 0 || y >= _height || z < 0 || z >= _width) return false;
             return _blocks[x, y, z] != BlockType.Air;
         }
     }
