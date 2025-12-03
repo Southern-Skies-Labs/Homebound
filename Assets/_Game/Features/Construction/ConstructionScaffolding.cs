@@ -43,13 +43,16 @@ namespace Homebound.Features.Construction
                 if (scaffold != null)
                 {
                     Vector3Int pos = Vector3Int.RoundToInt(scaffold.transform.position);
-                    if(_gridManager != null) _gridManager.UpdateNode(pos.x, pos.y, pos.z, false);
+                    
+
+                    if (_gridManager != null) 
+                        _gridManager.SetNode(pos.x, pos.y, pos.z, Homebound.Features.Navigation.NodeType.Air);
                     
                     Destroy(scaffold);
                 }
             }
             _activeScaffolds.Clear();
-            Debug.Log("[Scaffolding] Andamios retirados");
+            Debug.Log("[Scaffolding] Andamios retirados y Grid actualizado.");
         }
 
         public Vector3? GetRequiredScaffoldPosition(Vector3 blockWorldPos)
@@ -85,6 +88,10 @@ namespace Homebound.Features.Construction
         {
             GameObject newScaffold = Instantiate(_scaffoldPrefab, position, Quaternion.identity, _scaffoldContainer);
             _activeScaffolds.Add(newScaffold);
+            
+            Vector3Int pos = Vector3Int.RoundToInt(position);
+            if (_gridManager != null) 
+                _gridManager.SetNode(pos.x, pos.y, pos.z, Homebound.Features.Navigation.NodeType.Ground);
         }
 
         private bool IsScaffoldAt(Vector3Int pos)

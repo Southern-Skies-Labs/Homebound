@@ -7,14 +7,10 @@ using Homebound.Features.TaskSystem;
 using Homebound.Features.Economy;
 using Homebound.Features.AethianAI;
 
-
-
 namespace Homebound.Features.PlayerInteraction
 {
-    
     public class InteractionController : MonoBehaviour
     {
-        //Variables
         [Header("References")] 
         [SerializeField] private Camera _mainCamera;
         [SerializeField] private Transform _selectionGhost;
@@ -27,18 +23,14 @@ namespace Homebound.Features.PlayerInteraction
 
         public event Action<AethianBot> OnUnitSelected; 
         private RTSInputs _input;
-        private Vector3 _currentGridPos;
+        private Vector3 _currentGridPos; // Ahora guardará la Y real
         private bool _isValidHover;
         
-        
-        //Metodos
         private void Awake()
         {
             _input = new RTSInputs();
             if (_mainCamera == null) _mainCamera = Camera.main;
-            
         }
-
 
         private void OnEnable()
         {
@@ -61,22 +53,24 @@ namespace Homebound.Features.PlayerInteraction
         
         private void HandleRaycast()
         {
-            //Obtenemos posición dle mouse
             Vector2 mouseScreenPos = _input.Gameplay.Point.ReadValue<Vector2>();
-            
-            //Lanzamos el rayo
             Ray ray = _mainCamera.ScreenPointToRay(mouseScreenPos);
+
             if (Physics.Raycast(ray, out RaycastHit hit, 1000f, _groundLayer))
             {
-                //Calculamos la posición del gird
+                // --- FIX: Altura Dinámica ---
+                // Redondeamos X y Z para la grilla, pero tomamos la Y del impacto
                 int x = Mathf.RoundToInt(hit.point.x);
                 int z = Mathf.RoundToInt(hit.point.z);
                 
-                //Se asume que y=0 o y=1
-                _currentGridPos = new Vector3(x, 1.0f, z);
+                // Para la altura, usamos Mathf.Ceil para asegurarnos de estar "encima" del bloque
+                // o hit.point.y si queremos precisión decimal.
+                // Usaremos Ceil para que el ghost se pose sobre el vóxel.
+                float y = Mathf.Ceil(hit.point.y);
+
+                _currentGridPos = new Vector3(x, y, z);
                 _isValidHover = true;
                 
-                //Movemos el ghost
                 if (_selectionGhost != null)
                 {
                     _selectionGhost.gameObject.SetActive(true);
@@ -94,15 +88,13 @@ namespace Homebound.Features.PlayerInteraction
         {
             var jobManager = ServiceLocator.Get<JobManager>();
             if (jobManager == null) return;
-
             
             Vector2 mouseScreenPos = _input.Gameplay.Point.ReadValue<Vector2>();
             Ray ray = _mainCamera.ScreenPointToRay(mouseScreenPos);
 
-            //PRIORIDAD 0
+            // PRIORIDAD 0: UNIDADES
             if (Physics.Raycast(ray, out RaycastHit unitHit, 1000f, _unitLayer))
             {
-                // Debug.Log($"[RAYCAST] Golpeé Unidad: {unitHit.collider.name}");
                 var bot = unitHit.collider.GetComponentInParent<AethianBot>();
                 if (bot != null)
                 {
@@ -112,52 +104,49 @@ namespace Homebound.Features.PlayerInteraction
                 }
             }
             
-            
-            // PRIORIDAD 1
+            // PRIORIDAD 1: RECURSOS
             if (Physics.Raycast(ray, out RaycastHit resourceHit, 1000f, _resourceLayer))
             {
-                // Intentamos obtener el componente del padre o del objeto golpeado
                 var gatherable = resourceHit.collider.GetComponentInParent<IGatherable>();
-                
                 if (gatherable != null)
                 {
-                    // Crear tarea de recolección
                     var job = new JobRequest($"Talar {gatherable.Name}", JobType.Chop, gatherable.GetPosition(), gatherable.Transform, 50);
                     jobManager.PostJob(job);
-                    
                     OnUnitSelected?.Invoke(null);
-                    Debug.Log($"[Interaction] Árbol marcado para talar: {gatherable.Name}");
+                    Debug.Log($"[Interaction] Árbol marcado: {gatherable.Name}");
                     return; 
                 }
             }
 
-            // PRIORIDAD 2
+            // PRIORIDAD 2: SUELO (MOVIMIENTO)
             if (_isValidHover)
             {
-                // Debug.Log("[RAYCAST] Golpeé Suelo -> Deseleccionando");
                 OnUnitSelected?.Invoke(null);
-                Vector3 targetPos = new Vector3(_currentGridPos.x, 1.2f, _currentGridPos.z);
-                var job = new JobRequest("Ir a Posición", JobType.Haul, targetPos, null, 10); // Bajamos prioridad de mover a 10
+                
+                // --- FIX: Usar la posición calculada en HandleRaycast ---
+                // Ya contiene la altura correcta (Y) gracias al fix de arriba.
+                Vector3 targetPos = _currentGridPos; 
+
+                var job = new JobRequest("Ir a Posición", JobType.Haul, targetPos, null, 10);
                 jobManager.PostJob(job);
                 
-                OnUnitSelected?.Invoke(null);
-                Debug.Log($"[Interaction] Tarea de movimiento creada.");
+                Debug.Log($"[Interaction] Tarea de movimiento a {targetPos}");
             }
         }
-  
-
-        
 
         private void OnSpawnPerformed(InputAction.CallbackContext context)
         {
             if (!_isValidHover || _aethianPrefab == null) return;
 
-            Vector3 spawnPos = new Vector3(_currentGridPos.x, 2.0f, _currentGridPos.z);
-            Instantiate(_aethianPrefab, spawnPos, Quaternion.identity);
+            // --- FIX: Spawn con altura correcta ---
+            // Usamos la posición del ghost que ya está ajustada a la altura del terreno
+            Vector3 spawnPos = _currentGridPos;
             
+            // Opcional: +0.5f o +1.0f en Y para asegurar que no nazca atascado si el pivote está en los pies
+            // Si el pivote es pies, _currentGridPos (que usa Ceil) debería ser seguro.
+            
+            Instantiate(_aethianPrefab, spawnPos, Quaternion.identity);
             Debug.Log($"[Interaction] Aethian creado en {spawnPos}");
         }
-        
     }
-
 }

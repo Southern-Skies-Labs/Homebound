@@ -66,7 +66,7 @@ namespace Homebound.Features.AethianAI
                 RaycastHit hit;
 
                 // Buscamos colisión con cualquier cosa sólida (VoxelWorld)
-                if (Physics.Raycast(ray, out hit, 10f))
+                if (Physics.Raycast(ray, out hit, 1000f))
                 {
                     // "Teletransportamos" la unidad justo al punto de impacto
                     transform.position = hit.point;

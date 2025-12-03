@@ -1,6 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
 using Homebound.Features.VoxelWorld;
+using Homebound.Features.Navigation;
+using Homebound.Core;
 
 namespace Homebound.Features.VoxelWorld
 {
@@ -46,6 +48,8 @@ namespace Homebound.Features.VoxelWorld
 
             GenerateMapData();
             CreateMeshData();
+            
+            RegisterTerrainToGrid(); 
         }
 
         private void GenerateMapData()
@@ -191,5 +195,62 @@ namespace Homebound.Features.VoxelWorld
             if (x < 0 || x >= _width || y < 0 || y >= _height || z < 0 || z >= _width) return false;
             return _blocks[x, y, z] != BlockType.Air;
         }
+
+
+        private void RegisterTerrainToGrid()
+        {
+            var gridManager = ServiceLocator.Get<GridManager>();
+            if (gridManager == null)
+            {
+                Debug.LogError("[Chunk] No se encontró GridManager para registrar el terreno.");
+                return;
+            }
+
+            // Recorremos todo el chunk para "traducir" Bloque -> Nodo
+            for (int x = 0; x < _width; x++)
+            {
+                for (int z = 0; z < _width; z++)
+                {
+                    for (int y = 0; y < _height; y++)
+                    {
+                        BlockType block = _blocks[x, y, z];
+                        NodeType nodeType = NodeType.Air;
+
+                        switch (block)
+                        {
+                            case BlockType.Air:
+                                nodeType = NodeType.Air;
+                                break;
+
+                            case BlockType.Bedrock:
+                                nodeType = NodeType.ObstacleNatural; // Impasable
+                                break;
+
+                            // Todos los bloques sólidos caminables
+                            case BlockType.Grass:
+                            case BlockType.Dirt:
+                            case BlockType.Stone:
+                            case BlockType.Coal:
+                            case BlockType.Copper:
+                            case BlockType.Gold:
+                                nodeType = NodeType.Ground;
+                                break;
+
+                            // Futuro: Si añades agua, sería ObstacleNatural
+                            // Futuro: Si añades caminos, sería Road
+                        }
+
+                        // Enviamos el dato al Grid
+                        // Nota: Usamos las mismas coordenadas locales x,y,z porque asumimos
+                        // que el Grid y el Chunk están alineados en (0,0,0) del mundo lógico.
+                        gridManager.SetNode(x, y, z, nodeType);
+                    }
+                }
+            }
+
+            Debug.Log($"[Chunk] Terreno registrado en el Grid ({_width}x{_height}x{_width}).");
+        }
+        
+        
     }
 }
