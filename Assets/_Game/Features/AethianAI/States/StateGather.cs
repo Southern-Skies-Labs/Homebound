@@ -29,13 +29,13 @@ namespace Homebound.Features.AethianAI
             _myInventory = _bot.GetComponent<UnitInventory>();
             _cityInventory = ServiceLocator.Get<CityInventory>();
 
-            if (_bot.CurrentJob == null || _bot.CurrentJob.TargetObject == null)
+            if (_bot.CurrentJob == null || _bot.CurrentJob.Target == null)
             {
                 _bot.ChangeState(_bot.StateIdle);
                 return;
             }
             
-            _currentNode = _bot.CurrentJob.TargetObject.GetComponent<IGatherable>();
+            _currentNode = _bot.CurrentJob.Target.GetComponent<IGatherable>();
 
             if (_currentNode == null)
             {

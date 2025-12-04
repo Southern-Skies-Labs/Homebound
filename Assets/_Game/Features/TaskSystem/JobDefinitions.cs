@@ -1,52 +1,75 @@
 using UnityEngine;
-using System; 
 
 namespace Homebound.Features.TaskSystem
 {
+    public enum UnitClass
+    {
+        Villager,
+        Builder,
+        Miner,
+        Guard
+    }
+
     public enum JobType
     {
-        Idle = 0,
-        Haul = 10,
-        Chop = 20,
-        Build = 30,
-        Craft = 40
+        Idle,
+        Move,
+        Gather,
+        Build,
+        Haul,
+        Craft,
+        Chop
     }
-    
+
     [System.Serializable]
     public class JobRequest
     {
-        // Variables
         public string JobName;
         public JobType JobType;
+        public UnitClass RequiredClass;
         public Vector3 Position;
-        public Transform TargetObject; // Tu usas Transform, perfecto.
+        public Transform Target; // <--- SE LLAMA "Target", NO "TargetObject"
         public int Priority;
-        public bool IsClaimed;
-        
-        // Callback: Avisa a quien creó la tarea que ya terminó
-        public Action<JobRequest> OnCompleted; 
 
-        //Metodos
-        public JobRequest(string name, JobType type, Vector3 pos, Transform targetObject, int priority, Action<JobRequest> onCompleted = null)
+        public IJobWorker Owner { get; private set; } 
+        
+        public bool IsClaimed => Owner != null;
+        public bool IsCancelled { get; private set; }
+        public bool IsCompleted { get; private set; } // <--- NUEVO
+
+        public JobRequest(string name, JobType type, Vector3 pos, Transform target, int priority, UnitClass requiredClass = UnitClass.Villager)
         {
             JobName = name;
             JobType = type;
             Position = pos;
-            TargetObject = targetObject;
+            Target = target;
             Priority = priority;
-            OnCompleted = onCompleted;
-            IsClaimed = false;
+            RequiredClass = requiredClass;
+            
+            IsCancelled = false;
+            IsCompleted = false;
+            Owner = null;
         }
-        
-        public void ForceCancel()
+
+        public void Claim(IJobWorker worker)
         {
-            IsClaimed = true; 
-            OnCompleted = null; // Rompemos la referencia para evitar errores
+            Owner = worker;
         }
-        
+
+        public void ReturnToQueue()
+        {
+            Owner = null;
+        }
+
+        public void Cancel()
+        {
+            IsCancelled = true;
+        }
+
+        // --- FIX ERROR 5: Método Complete ---
         public void Complete()
         {
-            OnCompleted?.Invoke(this);
+            IsCompleted = true;
         }
     }
 }

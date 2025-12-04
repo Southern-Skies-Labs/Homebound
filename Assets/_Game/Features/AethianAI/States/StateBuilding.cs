@@ -1,6 +1,6 @@
 using UnityEngine;
 using Homebound.Features.Construction;
-using Homebound.Features.AethianAI.States;
+using Homebound.Features.TaskSystem;
 
 namespace Homebound.Features.AethianAI.States
 {
@@ -17,9 +17,9 @@ namespace Homebound.Features.AethianAI.States
         //Metodos
         public override void Enter()
         {
-            if (_bot.CurrentJob != null && _bot.CurrentJob.TargetObject != null)
+            if (_bot.CurrentJob != null && _bot.CurrentJob.Target != null)
             {
-                _targetSite = _bot.CurrentJob.TargetObject.GetComponent<ConstructionSite>();
+                _targetSite = _bot.CurrentJob.Target.GetComponent<ConstructionSite>();
             }
 
             if (_targetSite == null)

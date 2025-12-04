@@ -110,8 +110,14 @@ namespace Homebound.Features.PlayerInteraction
         
         private void OnSelectPerformed(InputAction.CallbackContext context)
         {
+            
             var jobManager = ServiceLocator.Get<JobManager>();
-            if (jobManager == null) return;
+            if (jobManager == null) 
+            {
+                // Si no hay sistema de tareas, no hacemos nada (evita el error rojo)
+                // Debug.LogWarning("JobManager no encontrado al hacer clic.");
+                return; 
+            }
             
             Vector2 mouseScreenPos = _input.Gameplay.Point.ReadValue<Vector2>();
             Ray ray = _mainCamera.ScreenPointToRay(mouseScreenPos);
@@ -134,7 +140,14 @@ namespace Homebound.Features.PlayerInteraction
                 var gatherable = resourceHit.collider.GetComponentInParent<IGatherable>();
                 if (gatherable != null)
                 {
-                    var job = new JobRequest($"Talar {gatherable.Name}", JobType.Chop, gatherable.GetPosition(), gatherable.Transform, 50);
+                    var job = new JobRequest(
+                        $"Talar {gatherable.Name}", 
+                        JobType.Chop, 
+                        gatherable.GetPosition(), 
+                        gatherable.Transform, 
+                        50, 
+                        UnitClass.Villager // <--- NUEVO
+                    );
                     jobManager.PostJob(job);
                     OnUnitSelected?.Invoke(null);
                     return; 
@@ -144,12 +157,20 @@ namespace Homebound.Features.PlayerInteraction
             // PRIORIDAD 2: SUELO (MOVIMIENTO)
             if (_isValidHover)
             {
+                var gatherable = resourceHit.collider.GetComponentInParent<IGatherable>();
                 OnUnitSelected?.Invoke(null);
                 
                 // Usamos la posición corregida (Grid)
                 Vector3 targetPos = _currentGridPos; 
 
-                var job = new JobRequest("Ir a Posición", JobType.Haul, targetPos, null, 10);
+                var job = new JobRequest(
+                    $"Talar {gatherable.Name}", 
+                    JobType.Chop, 
+                    gatherable.GetPosition(), 
+                    gatherable.Transform, 
+                    50, 
+                    UnitClass.Villager // <--- NUEVO
+                );
                 jobManager.PostJob(job);
                 
                 Debug.Log($"[Interaction] Orden de movimiento a {targetPos}");

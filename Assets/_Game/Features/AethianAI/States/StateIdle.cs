@@ -20,27 +20,25 @@ namespace Homebound.Features.AethianAI.States
             var jobManager = ServiceLocator.Get<JobManager>();
             if (jobManager != null)
             {
-                var job = jobManager.GetAvailableJob();
+                var job = jobManager.GetBestJobFor(_bot);
                 
                 if (job != null)
                 {
-                    
                     _bot.CurrentJob = job;
 
-                    
                     switch (job.JobType)
                     {
                         case JobType.Chop:
                             _bot.ChangeState(_bot.StateGather);
                             break;
-
                         case JobType.Build:
-                            
-                            _bot.ChangeState(_bot.StateBuilding); 
+                            _bot.ChangeState(_bot.StateBuilding);
                             break;
-
+                        case JobType.Haul:
+                            // _bot.ChangeState(_bot.StateHaul);
+                            _bot.ChangeState(_bot.StateWorking); // Temporal
+                            break;
                         default:
-                            
                             _bot.ChangeState(_bot.StateWorking);
                             break;
                     }

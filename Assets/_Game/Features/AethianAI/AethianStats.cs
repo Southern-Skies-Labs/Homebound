@@ -1,4 +1,5 @@
 using UnityEngine;
+using Homebound.Features.TaskSystem;
 
 namespace Homebound.Features.AethianAI
 {
@@ -9,6 +10,7 @@ namespace Homebound.Features.AethianAI
         [Header("Identity")] 
         public string CharacterName = "Aldeano";
         public string Title = "Errante";
+        public UnitClass Class = UnitClass.Villager;
         
         [Header("Vitality")] 
         public float Health = 100f;

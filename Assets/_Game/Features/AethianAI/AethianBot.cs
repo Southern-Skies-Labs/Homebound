@@ -9,7 +9,7 @@ using Homebound.Features.Navigation;
 
 namespace Homebound.Features.AethianAI
 {
-    public class AethianBot : MonoBehaviour
+    public class AethianBot : MonoBehaviour, IJobWorker
     {
         //Variables
         [Header("Data")] 
@@ -22,8 +22,12 @@ namespace Homebound.Features.AethianAI
         
         private TimeManager _timeManager;
         private float _lastHourCheck;
+        
+        public Vector3 Position => transform.position;
 
         private UnitMovementController _mover; // Nuestro nuevo chofer
+        
+        public UnitClass Class => Stats.Class;
         
         //Estado actual
         private AethianState _currentState;
@@ -127,6 +131,15 @@ namespace Homebound.Features.AethianAI
                     Stats.UpdateNeeds(deltaHours);
                     _lastHourCheck = currentHour;
                 }
+            }
+            
+            if (CurrentJob != null && CurrentJob.IsCancelled)
+            {
+                Debug.Log($"[Aethian] {name}: Mi tarea '{CurrentJob.JobName}' fue cancelada. Parando.");
+                StopMoving(); // Frenamos el motor
+                CurrentJob = null; // Olvidamos la tarea
+                ChangeState(StateIdle); // Volvemos a buscar trabajo
+                return; // Saltamos el resto del frame
             }
             
             // 2. Transiciones

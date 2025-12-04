@@ -87,11 +87,9 @@ namespace Homebound.Features.VoxelWorld
                             else 
                             {
                                 // Lógica Procedural de Minerales (Simple Probabilidad 3D)
-                                // Usamos un ruido 3D simple o Random determinista basado en coordenadas
+                                // Usé un ruido 3D simple o Random determinista basado en coordenadas
                                 float oreNoise = Mathf.PerlinNoise(worldX * 0.1f + y * 0.5f, worldZ * 0.1f);
                                 
-                                // Podríamos usar Random.value para dispersión pura, o ruido para vetas.
-                                // Usaremos Random con Seed para determinismo local simple por ahora.
                                 float rng = Random.value; 
                                 
                                 if (rng < _goldChance && y < 10) _blocks[x, y, z] = BlockType.Gold; // Oro solo profundo

@@ -168,14 +168,15 @@ namespace Homebound.Features.Construction
         {
             if (_jobManager == null) return;
 
-                JobRequest newJob = new JobRequest(
-                "Construir " + _blueprint.name, 
-                JobType.Build,                  
-                transform.position,             
-                this.transform,                 
-                1,                              
-                OnJobCompleted                  
+            JobRequest newJob = new JobRequest(
+                "Construir " + _blueprint.name,
+                JobType.Build,
+                transform.position,
+                this.transform,
+                1,
+                UnitClass.Villager 
             );
+            
 
             _activeJobs.Add(newJob);
             _jobManager.PostJob(newJob);
@@ -191,7 +192,7 @@ namespace Homebound.Features.Construction
         {
             foreach (var job in _activeJobs)
             {
-                job.ForceCancel(); // Ahora sí existe este método
+                job.Cancel(); // Ahora sí existe este método
             }
             _activeJobs.Clear();
         }
@@ -281,10 +282,10 @@ namespace Homebound.Features.Construction
             JobRequest scaffoldJob = new JobRequest(
                 "Construir Andamio",
                 JobType.Build,
-                pos,
+                transform.position,
                 this.transform,
-                10,
-                OnScaffoldJobCompleted
+                1,
+                UnitClass.Villager
                 );
             _activeJobs.Add(scaffoldJob);
             _jobManager.PostJob(scaffoldJob);
