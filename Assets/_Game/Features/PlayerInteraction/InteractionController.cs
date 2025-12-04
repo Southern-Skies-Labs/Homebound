@@ -6,6 +6,7 @@ using Homebound.Core;
 using Homebound.Features.TaskSystem;
 using Homebound.Features.Economy;
 using Homebound.Features.AethianAI;
+using Homebound.Features.Navigation; // Necesario
 
 namespace Homebound.Features.PlayerInteraction
 {
@@ -23,13 +24,20 @@ namespace Homebound.Features.PlayerInteraction
 
         public event Action<AethianBot> OnUnitSelected; 
         private RTSInputs _input;
-        private Vector3 _currentGridPos; // Ahora guardará la Y real
+        private Vector3 _currentGridPos; 
         private bool _isValidHover;
         
+        private GridManager _gridManager; // Referencia al Grid
+
         private void Awake()
         {
             _input = new RTSInputs();
             if (_mainCamera == null) _mainCamera = Camera.main;
+        }
+
+        private void Start()
+        {
+            _gridManager = ServiceLocator.Get<GridManager>();
         }
 
         private void OnEnable()
@@ -58,17 +66,33 @@ namespace Homebound.Features.PlayerInteraction
 
             if (Physics.Raycast(ray, out RaycastHit hit, 1000f, _groundLayer))
             {
-                // --- FIX: Altura Dinámica ---
-                // Redondeamos X y Z para la grilla, pero tomamos la Y del impacto
+                // 1. Coordenada Base (El bloque que tocamos)
                 int x = Mathf.RoundToInt(hit.point.x);
                 int z = Mathf.RoundToInt(hit.point.z);
-                
-                // Para la altura, usamos Mathf.Ceil para asegurarnos de estar "encima" del bloque
-                // o hit.point.y si queremos precisión decimal.
-                // Usaremos Ceil para que el ghost se pose sobre el vóxel.
-                float y = Mathf.Ceil(hit.point.y);
+                int yRaw = Mathf.RoundToInt(hit.point.y); // Altura aproximada del impacto
 
-                _currentGridPos = new Vector3(x, y, z);
+                // 2. Corrección de Altura Inteligente
+                // Buscamos cuál es la superficie caminable real en esta columna (x, z)
+                // Probamos desde un poco abajo hasta un poco arriba del impacto
+                float finalY = yRaw + 1; // Por defecto asumimos "Encima del bloque"
+
+                if (_gridManager != null)
+                {
+                    // Buscamos el nodo verde (WalkableSurface) más cercano verticalmente
+                    for (int yOffset = -2; yOffset <= 2; yOffset++)
+                    {
+                        int checkY = yRaw + yOffset;
+                        PathNode node = _gridManager.GetNode(x, checkY, z);
+                        
+                        if (node != null && node.IsWalkableSurface)
+                        {
+                            finalY = checkY; // ¡Encontramos el nodo verde!
+                            break;
+                        }
+                    }
+                }
+
+                _currentGridPos = new Vector3(x, finalY, z);
                 _isValidHover = true;
                 
                 if (_selectionGhost != null)
@@ -113,7 +137,6 @@ namespace Homebound.Features.PlayerInteraction
                     var job = new JobRequest($"Talar {gatherable.Name}", JobType.Chop, gatherable.GetPosition(), gatherable.Transform, 50);
                     jobManager.PostJob(job);
                     OnUnitSelected?.Invoke(null);
-                    Debug.Log($"[Interaction] Árbol marcado: {gatherable.Name}");
                     return; 
                 }
             }
@@ -123,30 +146,20 @@ namespace Homebound.Features.PlayerInteraction
             {
                 OnUnitSelected?.Invoke(null);
                 
-                // --- FIX: Usar la posición calculada en HandleRaycast ---
-                // Ya contiene la altura correcta (Y) gracias al fix de arriba.
+                // Usamos la posición corregida (Grid)
                 Vector3 targetPos = _currentGridPos; 
 
                 var job = new JobRequest("Ir a Posición", JobType.Haul, targetPos, null, 10);
                 jobManager.PostJob(job);
                 
-                Debug.Log($"[Interaction] Tarea de movimiento a {targetPos}");
+                Debug.Log($"[Interaction] Orden de movimiento a {targetPos}");
             }
         }
 
         private void OnSpawnPerformed(InputAction.CallbackContext context)
         {
             if (!_isValidHover || _aethianPrefab == null) return;
-
-            // --- FIX: Spawn con altura correcta ---
-            // Usamos la posición del ghost que ya está ajustada a la altura del terreno
-            Vector3 spawnPos = _currentGridPos;
-            
-            // Opcional: +0.5f o +1.0f en Y para asegurar que no nazca atascado si el pivote está en los pies
-            // Si el pivote es pies, _currentGridPos (que usa Ceil) debería ser seguro.
-            
-            Instantiate(_aethianPrefab, spawnPos, Quaternion.identity);
-            Debug.Log($"[Interaction] Aethian creado en {spawnPos}");
+            Instantiate(_aethianPrefab, _currentGridPos, Quaternion.identity);
         }
     }
 }

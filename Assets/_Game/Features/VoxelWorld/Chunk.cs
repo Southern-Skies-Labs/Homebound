@@ -206,7 +206,6 @@ namespace Homebound.Features.VoxelWorld
                 return;
             }
 
-            // Recorremos todo el chunk para "traducir" Bloque -> Nodo
             for (int x = 0; x < _width; x++)
             {
                 for (int z = 0; z < _width; z++)
@@ -223,27 +222,18 @@ namespace Homebound.Features.VoxelWorld
                                 break;
 
                             case BlockType.Bedrock:
-                                nodeType = NodeType.ObstacleNatural; // Impasable
+                                nodeType = NodeType.Solid; // Impasable
                                 break;
 
                             // Todos los bloques sólidos caminables
-                            case BlockType.Grass:
-                            case BlockType.Dirt:
-                            case BlockType.Stone:
-                            case BlockType.Coal:
-                            case BlockType.Copper:
-                            case BlockType.Gold:
-                                nodeType = NodeType.Ground;
-                                break;
-
-                            // Futuro: Si añades agua, sería ObstacleNatural
-                            // Futuro: Si añades caminos, sería Road
+                            default: nodeType = NodeType.Solid; break;
                         }
 
-                        // Enviamos el dato al Grid
-                        // Nota: Usamos las mismas coordenadas locales x,y,z porque asumimos
-                        // que el Grid y el Chunk están alineados en (0,0,0) del mundo lógico.
-                        gridManager.SetNode(x, y, z, nodeType);
+                        int worldX = (int)transform.position.x + (x - _xOffset);
+                        int worldZ = (int)transform.position.z + (z - _zOffset);
+                        int worldY = (int)transform.position.y + y;
+
+                        gridManager.SetNode(worldX, worldY, worldZ, nodeType);
                     }
                 }
             }

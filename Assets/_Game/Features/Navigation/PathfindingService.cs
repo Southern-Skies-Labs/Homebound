@@ -7,7 +7,7 @@ namespace Homebound.Features.Navigation
     public class PathfindingService : MonoBehaviour
     {
         private GridManager _gridManager;
-        private const int MAX_ITERATIONS = 10000; // Seguridad
+        private const int MAX_ITERATIONS = 5000; 
 
         private void Awake() => ServiceLocator.Register(this);
         private void Start() => _gridManager = ServiceLocator.Get<GridManager>();
@@ -17,16 +17,17 @@ namespace Homebound.Features.Navigation
         {
             if (_gridManager == null) return null;
 
-            // Convertir Mundo -> Grilla
-            PathNode startNode = _gridManager.GetNode(Mathf.RoundToInt(startPos.x), Mathf.RoundToInt(startPos.y), Mathf.RoundToInt(startPos.z));
-            PathNode targetNode = _gridManager.GetNode(Mathf.RoundToInt(targetPos.x), Mathf.RoundToInt(targetPos.y), Mathf.RoundToInt(targetPos.z));
+            // 1. Obtener Nodos Base
+            PathNode startNode = GetValidNodeNear(startPos);
+            PathNode targetNode = GetValidNodeNear(targetPos);
 
-            if (startNode == null || targetNode == null) return null;
-            
-            // NOTA: A veces el target es un obstáculo (ej: click en muro).
-            // Deberíamos buscar el vecino caminable más cercano, pero por ahora strict check.
-            if (!targetNode.IsWalkable) return null;
+            if (startNode == null || targetNode == null) 
+            {
+                Debug.LogWarning($"[Pathfinding] No se encontró nodo válido cerca de Inicio {startPos} o Fin {targetPos}");
+                return null;
+            }
 
+            // 2. Algoritmo A* (Estándar)
             List<PathNode> openSet = new List<PathNode> { startNode };
             HashSet<PathNode> closedSet = new HashSet<PathNode>();
 
@@ -37,15 +38,13 @@ namespace Homebound.Features.Navigation
 
             while (openSet.Count > 0)
             {
-                if (iterations++ > MAX_ITERATIONS) break;
+                if (iterations++ > MAX_ITERATIONS) return null;
 
                 PathNode currentNode = openSet[0];
                 for (int i = 1; i < openSet.Count; i++)
                 {
                     if (openSet[i].FCost < currentNode.FCost || openSet[i].FCost == currentNode.FCost && openSet[i].HCost < currentNode.HCost)
-                    {
                         currentNode = openSet[i];
-                    }
                 }
 
                 openSet.Remove(currentNode);
@@ -57,14 +56,11 @@ namespace Homebound.Features.Navigation
                 {
                     if (closedSet.Contains(neighbor)) continue;
 
-                    // --- LÓGICA DE COSTES (ROADS) ---
-                    // Distancia base * Coste del Terreno.
-                    // Si es Road (0.5), moverse cuesta la mitad.
-                    float moveCostToNeighbor = currentNode.GCost + (GetDistance(currentNode, neighbor) * neighbor.MovementCost);
-
-                    if (moveCostToNeighbor < neighbor.GCost || !openSet.Contains(neighbor))
+                    float moveCost = currentNode.GCost + (GetDistance(currentNode, neighbor) * neighbor.MovementPenalty);
+                    
+                    if (moveCost < neighbor.GCost || !openSet.Contains(neighbor))
                     {
-                        neighbor.GCost = moveCostToNeighbor;
+                        neighbor.GCost = moveCost;
                         neighbor.HCost = GetDistance(neighbor, targetNode);
                         neighbor.Parent = currentNode;
 
@@ -72,18 +68,46 @@ namespace Homebound.Features.Navigation
                     }
                 }
             }
-
             return null;
+        }
+
+        // --- MÉTODO DE BÚSQUEDA TOLERANTE ---
+        // Si la coordenada exacta falla, busca arriba/abajo/lados.
+        private PathNode GetValidNodeNear(Vector3 pos)
+        {
+            int x = Mathf.RoundToInt(pos.x);
+            int y = Mathf.RoundToInt(pos.y);
+            int z = Mathf.RoundToInt(pos.z);
+
+            // 1. Intento Directo
+            PathNode node = _gridManager.GetNode(x, y, z);
+            if (IsValid(node)) return node;
+
+            // 2. Intento Vertical (Prioridad: Arriba -> Abajo)
+            // Útil si el bot está hundido o el click fue en el suelo
+            PathNode up = _gridManager.GetNode(x, y + 1, z);
+            if (IsValid(up)) return up;
+            
+            PathNode down = _gridManager.GetNode(x, y - 1, z);
+            if (IsValid(down)) return down;
+
+            // 3. Intento Horizontal (Por si clicamos un muro)
+            // (Opcional, expandir si es necesario)
+            
+            return null;
+        }
+
+        private bool IsValid(PathNode n)
+        {
+            return n != null && n.IsWalkableSurface;
         }
 
         private List<Vector3> RetracePath(PathNode startNode, PathNode endNode)
         {
             List<Vector3> path = new List<Vector3>();
             PathNode currentNode = endNode;
-
             while (currentNode != startNode)
             {
-                // +0.5f para centrar en el bloque
                 path.Add(new Vector3(currentNode.X + 0.5f, currentNode.Y, currentNode.Z + 0.5f));
                 currentNode = currentNode.Parent;
             }
@@ -91,14 +115,12 @@ namespace Homebound.Features.Navigation
             return path;
         }
 
-        private int GetDistance(PathNode nodeA, PathNode nodeB)
+        private float GetDistance(PathNode nodeA, PathNode nodeB)
         {
             int dstX = Mathf.Abs(nodeA.X - nodeB.X);
             int dstY = Mathf.Abs(nodeA.Y - nodeB.Y);
             int dstZ = Mathf.Abs(nodeA.Z - nodeB.Z);
-
-            if (dstX > dstZ) return 14 * dstZ + 10 * (dstX - dstZ) + 10 * dstY;
-            return 14 * dstX + 10 * (dstZ - dstX) + 10 * dstY;
+            return dstX + dstZ + dstY;
         }
     }
 }

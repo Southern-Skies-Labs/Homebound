@@ -91,7 +91,7 @@ namespace Homebound.Features.Construction
             
             Vector3Int pos = Vector3Int.RoundToInt(position);
             if (_gridManager != null) 
-                _gridManager.SetNode(pos.x, pos.y, pos.z, Homebound.Features.Navigation.NodeType.Ground);
+                _gridManager.SetNode(pos.x, pos.y, pos.z, Homebound.Features.Navigation.NodeType.Solid);
         }
 
         private bool IsScaffoldAt(Vector3Int pos)

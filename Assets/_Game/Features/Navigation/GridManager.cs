@@ -7,9 +7,8 @@ namespace Homebound.Features.Navigation
     public class GridManager : MonoBehaviour
     {
         private PathNode[,,] _grid;
-        private int _width;
-        private int _height;
-        private int _depth;
+        private int _width, _height, _depth;
+        private Vector3Int _gridOriginOffset; // Offset para centrar coordenadas
 
         private void Awake() => ServiceLocator.Register(this);
         private void OnDestroy() => ServiceLocator.Unregister<GridManager>();
@@ -19,135 +18,111 @@ namespace Homebound.Features.Navigation
             _width = width; _height = height; _depth = depth;
             _grid = new PathNode[width, height, depth];
 
+            // Offset: Si width=50, offset es -25. El array [0] corresponde a mundo -25.
+            int xOff = width / 2;
+            int zOff = depth / 2;
+            _gridOriginOffset = new Vector3Int(-xOff, 0, -zOff);
+
             for (int x = 0; x < width; x++)
                 for (int z = 0; z < depth; z++)
                     for (int y = 0; y < height; y++)
-                        _grid[x, y, z] = new PathNode(x, y, z);
+                    {
+                        int worldX = x + _gridOriginOffset.x;
+                        int worldZ = z + _gridOriginOffset.z;
+                        _grid[x, y, z] = new PathNode(worldX, y, worldZ);
+                    }
             
-            Debug.Log($"[GridManager] Grilla Táctica inicializada: {width}x{height}x{depth}");
+            Debug.Log($"[GridManager] Grilla 2.0 inicializada: {width}x{height}x{depth}");
+        }
+
+        // Convierte Coordenada Mundo -> Índice Array
+        public Vector3Int WorldToArray(int x, int y, int z)
+        {
+            return new Vector3Int(x - _gridOriginOffset.x, y - _gridOriginOffset.y, z - _gridOriginOffset.z);
         }
 
         // --- API DE ACTUALIZACIÓN ---
-
-        // Llamado por el Chunk o ConstructionSite
-        public void SetNode(int x, int y, int z, NodeType type)
+        public void SetNode(int worldX, int worldY, int worldZ, NodeType type)
         {
-            if (!IsInsideGrid(x, y, z)) return;
+            Vector3Int idx = WorldToArray(worldX, worldY, worldZ);
+            if (!CheckIndexBounds(idx.x, idx.y, idx.z)) return;
 
-            PathNode node = _grid[x, y, z];
+            PathNode node = _grid[idx.x, idx.y, idx.z];
             node.Type = type;
+            node.MovementPenalty = (type == NodeType.Road) ? 0.5f : 1.0f;
 
-            // Configuramos las propiedades según el tipo
-            switch (type)
-            {
-                case NodeType.Ground:
-                    node.IsWalkable = true;
-                    node.MovementCost = 1.0f; // Velocidad normal
-                    break;
-                
-                case NodeType.Road:
-                    node.IsWalkable = true;
-                    node.MovementCost = 0.5f; // ¡Doble de rápido! (Prioridad A*)
-                    break;
-
-                case NodeType.Air:
-                    node.IsWalkable = false; // No se pisa el aire
-                    break;
-
-                case NodeType.ObstacleNatural:
-                case NodeType.ObstaclePlayer:
-                    node.IsWalkable = false; // Bloqueado
-                    break;
-            }
+            // Recalcular si este nodo y el de ARRIBA son superficies caminables
+            UpdateWalkability(idx.x, idx.y, idx.z);
+            UpdateWalkability(idx.x, idx.y + 1, idx.z); 
         }
 
-        // --- API DE CONSULTA ---
-
-        public bool IsInsideGrid(int x, int y, int z)
+        private void UpdateWalkability(int ix, int iy, int iz)
         {
-            return x >= 0 && x < _width && y >= 0 && y < _height && z >= 0 && z < _depth;
+            if (!CheckIndexBounds(ix, iy, iz)) return;
+
+            PathNode node = _grid[ix, iy, iz];
+            PathNode below = GetNodeByIndex(ix, iy - 1, iz);
+            PathNode above = GetNodeByIndex(ix, iy + 1, iz);
+
+            // REGLA DE ORO:
+            // 1. Yo soy AIRE (no muro).
+            // 2. Abajo hay SÓLIDO (suelo).
+            // 3. Arriba hay AIRE (espacio cabeza).
+            
+            bool isSolid = (node.Type != NodeType.Air);
+            bool isSolidBelow = (below != null && below.Type != NodeType.Air);
+            bool isHeadClear = (above == null || above.Type == NodeType.Air);
+
+            node.IsWalkableSurface = !isSolid && isSolidBelow && isHeadClear;
         }
 
-        public PathNode GetNode(int x, int y, int z)
-        {
-            if (IsInsideGrid(x, y, z)) return _grid[x, y, z];
-            return null;
-        }
-
+        // --- LÓGICA DE VECINOS ---
         public List<PathNode> GetNeighbors(PathNode node)
         {
             List<PathNode> neighbors = new List<PathNode>();
             int[] xDir = { 0, 1, 0, -1 };
             int[] zDir = { 1, 0, -1, 0 };
 
+            // Convertimos a índices internos para buscar
+            Vector3Int centerIdx = WorldToArray(node.X, node.Y, node.Z);
+
             for (int i = 0; i < 4; i++)
             {
-                int checkX = node.X + xDir[i];
-                int checkZ = node.Z + zDir[i];
+                int nx = centerIdx.x + xDir[i];
+                int nz = centerIdx.z + zDir[i];
 
-                // Lógica Voxel Simplificada para Fase 1:
-                // Un vecino es válido si:
-                // 1. La casilla destino NO es un obstáculo (Muro).
-                // 2. La casilla DEBAJO del destino ES sólida (Suelo/Camino).
-                //    (Opcional: Si implementamos saltos/caídas, esto cambia).
-                
-                // Revisamos la celda al mismo nivel (Caminar plano)
-                CheckAndAddNeighbor(checkX, node.Y, checkZ, neighbors);
-                
-                // Revisamos celda abajo (Bajar escalón)
-                CheckAndAddNeighbor(checkX, node.Y - 1, checkZ, neighbors);
-
-                // Revisamos celda arriba (Subir escalón)
-                CheckAndAddNeighbor(checkX, node.Y + 1, checkZ, neighbors);
+                // Revisamos niveles: -1 (Bajar), 0 (Plano), +1 (Subir)
+                for (int yOffset = -1; yOffset <= 1; yOffset++)
+                {
+                    int ny = centerIdx.y + yOffset;
+                    
+                    PathNode neighbor = GetNodeByIndex(nx, ny, nz);
+                    
+                    // Si el vecino es una superficie válida (Aire con suelo abajo)
+                    if (neighbor != null && neighbor.IsWalkableSurface)
+                    {
+                        neighbors.Add(neighbor);
+                    }
+                }
             }
             return neighbors;
         }
 
-        private void CheckAndAddNeighbor(int x, int y, int z, List<PathNode> list)
+        public PathNode GetNode(int worldX, int worldY, int worldZ)
         {
-            if (IsInsideGrid(x, y, z))
-            {
-                PathNode targetNode = _grid[x, y, z];
-                
-                // Regla: La celda destino debe ser AIRE (espacio para la cabeza)
-                // Y la celda de abajo debe ser SUELO/ROAD.
-                // PERO: Como definimos SetNode, si NodeType es Ground/Road, 
-                // asumimos que el nodo representa la SUPERFICIE caminable.
-                
-                // Si tu Chunk define (x,0,z) como Tierra, ese nodo es Ground.
-                // El bot camina SOBRE (x,1,z).
-                // Ajustaremos esto en la integración.
-                
-                if (targetNode.IsWalkable)
-                {
-                    list.Add(targetNode);
-                }
-            }
+            Vector3Int idx = WorldToArray(worldX, worldY, worldZ);
+            return GetNodeByIndex(idx.x, idx.y, idx.z);
         }
-        
-        // --- DEBUG GIZMOS (Para ver caminos y obstáculos) ---
-        private void OnDrawGizmos()
-        {
-            if (_grid == null) return;
-            Vector3 cam = Camera.main ? Camera.main.transform.position : Vector3.zero;
 
-            for (int x = 0; x < _width; x++)
-                for (int z = 0; z < _depth; z++)
-                    if (Vector3.Distance(new Vector3(x, 0, z), new Vector3(cam.x, 0, cam.z)) < 30) // Optimización
-                        for (int y = 0; y < _height; y++)
-                        {
-                            PathNode n = _grid[x, y, z];
-                            if (n.Type == NodeType.ObstaclePlayer) 
-                            {
-                                Gizmos.color = Color.red;
-                                Gizmos.DrawWireCube(new Vector3(x + 0.5f, y + 0.5f, z + 0.5f), Vector3.one * 0.9f);
-                            }
-                            else if (n.Type == NodeType.Road)
-                            {
-                                Gizmos.color = Color.blue;
-                                Gizmos.DrawCube(new Vector3(x + 0.5f, y + 0.1f, z + 0.5f), new Vector3(0.8f, 0.1f, 0.8f));
-                            }
-                        }
+        private PathNode GetNodeByIndex(int ix, int iy, int iz)
+        {
+            if (CheckIndexBounds(ix, iy, iz)) return _grid[ix, iy, iz];
+            return null;
+        }
+
+        private bool CheckIndexBounds(int ix, int iy, int iz)
+        {
+            return ix >= 0 && ix < _width && iy >= 0 && iy < _height && iz >= 0 && iz < _depth;
         }
     }
 }

@@ -85,6 +85,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _moveSpeed: 4
   _rotationSpeed: 10
+  _emergencyLadderPrefab: {fileID: 7157428569874335621, guid: b5d63164a85327e4c8ceb3aff4b6434f, type: 3}
 --- !u!114 &8238417413627897938
 MonoBehaviour:
   m_ObjectHideFlags: 0

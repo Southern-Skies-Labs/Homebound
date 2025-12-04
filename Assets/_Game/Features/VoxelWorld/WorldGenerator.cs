@@ -16,7 +16,7 @@ namespace Homebound.Features.VoxelWorld
         //Metodos
         private void Start()
         {
-            // InitializeNavigationGrid();
+            InitializeNavigationGrid();
             CreateChunk();
         }
         
