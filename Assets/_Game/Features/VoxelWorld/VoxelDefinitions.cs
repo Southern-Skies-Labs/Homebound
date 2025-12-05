@@ -18,23 +18,13 @@ namespace Homebound.Features.VoxelWorld
     
     public static class VoxelData
     {
-        //CONFIGURACIÓN DEL ATLAS
-        
-        public static readonly float TextureAtlasSizeInBlocks = 4.0f; 
-        
-        public static float NormalizedBlockTextureSize => 1.0f / TextureAtlasSizeInBlocks;
-
-        
+        // Vértices y Triángulos 
         public static readonly Vector3[] VoxelVerts = new Vector3[8]
         {
-            new Vector3(0.0f, 0.0f, 0.0f), 
-            new Vector3(1.0f, 0.0f, 0.0f), 
-            new Vector3(1.0f, 1.0f, 0.0f), 
-            new Vector3(0.0f, 1.0f, 0.0f), 
-            new Vector3(0.0f, 0.0f, 1.0f), 
-            new Vector3(1.0f, 0.0f, 1.0f), 
-            new Vector3(1.0f, 1.0f, 1.0f), 
-            new Vector3(0.0f, 1.0f, 1.0f), 
+            new Vector3(0.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f), 
+            new Vector3(1.0f, 1.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), 
+            new Vector3(0.0f, 0.0f, 1.0f), new Vector3(1.0f, 0.0f, 1.0f), 
+            new Vector3(1.0f, 1.0f, 1.0f), new Vector3(0.0f, 1.0f, 1.0f), 
         };
         
         public static readonly int[,] VoxelTris = new int[6, 4]
@@ -49,33 +39,42 @@ namespace Homebound.Features.VoxelWorld
             new Vector3Int(0, -1, 0), new Vector3Int(-1, 0, 0), new Vector3Int(1, 0, 0)
         };
 
-        //LÓGICA DE UVS
-        public static Vector2 GetTextureCoordinates(BlockType blockID)
-        {
-            int index = (int)blockID - 1; 
-            if (index < 0) return Vector2.zero;
+        //SISTEMA DE TEXTURE ARRAY 
+        //Formato: { Indice_Inicio, Cantidad_Variantes }
 
-            
-            int x = index % (int)TextureAtlasSizeInBlocks;
-            int y = index / (int)TextureAtlasSizeInBlocks;
-            
-            return new Vector2(x, y);
-        }
-        
-        // Define las 4 esquinas UV para una cara
-        public static Vector2[] GetUVs(BlockType blockID)
+        private static readonly int[][] BlockTextureIndices = new int[][]
         {
-            Vector2 texturePos = GetTextureCoordinates(blockID);
-            float size = NormalizedBlockTextureSize;
-            float eps = 0.06f; 
+            new int[] { 0, 0 },   // 0: Air (No usa texturas)
+            new int[] { 0, 3 },   // 1: Grass (Índices 0, 1, 2) -> 3 variantes
+            new int[] { 3, 2 },   // 2: Dirt  (Índices 3, 4)    -> 2 variantes
+            new int[] { 5, 2 },   // 3: Stone (Índices 5, 6)    -> 2 variantes
+            new int[] { 7, 1 },   // 4: Coal  (Índice 7)        -> 1 variante
+            new int[] { 8, 2 },   // 5: Copper (Índices 8, 9)   -> 2 variantes
+            new int[] { 10, 2 },  // 6: Gold   (Índices 10, 11) -> 2 variantes (CORREGIDO, antes pisaba Copper)
+            // new int[] { 12, 2 },  // 7: Wood   (Índices 12, 13) -> 2 variantes (CORREGIDO)
+            // new int[] { 14, 2 },  // 8: Leaves (Índices 14, 15) -> 2 variantes (CORREGIDO)
+        };
 
-            return new Vector2[]
-            {
-                new Vector2(texturePos.x * size + eps, texturePos.y * size + eps),
-                new Vector2(texturePos.x * size + eps, (texturePos.y + 1) * size - eps),
-                new Vector2((texturePos.x + 1) * size - eps, (texturePos.y + 1) * size - eps),
-                new Vector2((texturePos.x + 1) * size - eps, texturePos.y * size + eps)
-            };
+        public static int GetTextureIndex(BlockType blockID, Vector3 position)
+        {
+            // Mapeo seguro para Bedrock u otros
+            if (blockID == BlockType.Bedrock) return 5; // Usa piedra por defecto
+            int id = (int)blockID;
+            if (id >= BlockTextureIndices.Length) return 0;
+
+            int[] info = BlockTextureIndices[id];
+            int startIndex = info[0];
+            int variantCount = info[1];
+
+            if (variantCount <= 1) return startIndex;
+
+            // --- ESTOCÁSTICO DETERMINISTA ---
+            int seed = Mathf.FloorToInt(position.x * 3f + position.y * 7f + position.z * 13f);
+            
+            // Usamos System.Random o un hash simple
+            int variant = Mathf.Abs(seed) % variantCount;
+
+            return startIndex + variant;
         }
     }
 }

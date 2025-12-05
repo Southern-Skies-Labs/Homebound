@@ -29,7 +29,7 @@ namespace Homebound.Features.VoxelWorld
         // Listas de Malla
         private List<Vector3> _vertices = new List<Vector3>();
         private List<int> _triangles = new List<int>();
-        private List<Vector2> _uvs = new List<Vector2>(); 
+        private List<Vector3> _uvs = new List<Vector3>(); 
 
         private int _xOffset;
         private int _zOffset;
@@ -130,7 +130,7 @@ namespace Homebound.Features.VoxelWorld
             _mesh.Clear();
             _mesh.vertices = _vertices.ToArray();
             _mesh.triangles = _triangles.ToArray();
-            _mesh.uv = _uvs.ToArray(); // Asignamos UVs
+            _mesh.SetUVs(0, _uvs); // Asignamos UVs
             
             _mesh.RecalculateNormals();
             GetComponent<MeshCollider>().sharedMesh = _mesh;
@@ -139,8 +139,10 @@ namespace Homebound.Features.VoxelWorld
         private void AddVoxelDataToChunk(int x, int y, int z)
         {
             BlockType type = _blocks[x, y, z];
-            Vector2[] uvs = VoxelData.GetUVs(type); 
+            Vector3 worldPos = new Vector3(x, y ,z);
 
+            float textureIndex = VoxelData.GetTextureIndex(type, worldPos);
+            
             for (int p = 0; p < 6; p++)
             {
                 if (!CheckVoxel(x + VoxelData.FaceChecks[p].x, y + VoxelData.FaceChecks[p].y, z + VoxelData.FaceChecks[p].z))
@@ -151,19 +153,18 @@ namespace Homebound.Features.VoxelWorld
                         Vector3 pos = VoxelData.VoxelVerts[triangleIndex] + new Vector3(x - _xOffset, y, z - _zOffset);
                         _vertices.Add(pos);
                         
-                        // Mapeo UV estándar para cada cara (0,0 -> 0,1 -> 1,1 -> 1,0)
-                        // Aquí necesitamos mapear los 4 vértices del Quad a las 4 esquinas del UV que nos devolvió VoxelData
-                        // Orden de VoxelTris: 0, 1, 2, 3 (Bl, Br, Tr, Tl) -> Depende de tu definición exacta de Tris
+                        Vector3 uv = Vector3.zero;
+                        uv.z = textureIndex;
+
+                        // Mapeo simple de esquinas (0,0), (0,1), etc.
+                        // Según el orden de VoxelTris: 0 (BL), 1 (BR), 2 (TL), 3 (TR)
+                        // Verifica visualmente si las texturas salen rotadas
+                        if(i == 0) { uv.x = 0; uv.y = 0; }
+                        if(i == 1) { uv.x = 1; uv.y = 0; }
+                        if(i == 2) { uv.x = 0; uv.y = 1; }
+                        if(i == 3) { uv.x = 1; uv.y = 1; }
                         
-                        // Simplificación para Quad UVs:
-                        // Asumimos que VoxelData.GetUVs devuelve [BL, TL, TR, BR] o similar.
-                        // Ajustaremos esto visualmente:
-                        if(i == 0) _uvs.Add(uvs[0]); // 0,0
-                        if(i == 1) _uvs.Add(uvs[3]); // 1,0
-                        if(i == 2) _uvs.Add(uvs[1]); // 0,1
-                        if(i == 3) _uvs.Add(uvs[2]); // 1,1
-                        // Nota: El orden exacto puede requerir prueba y error según como rote la textura, 
-                        // pero esto asigna una esquina de la textura a cada vértice.
+                        _uvs.Add(uv);
                     }
 
                     int vertCount = _vertices.Count;
