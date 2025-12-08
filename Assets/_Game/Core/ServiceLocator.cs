@@ -55,7 +55,17 @@ namespace Homebound.Core
                 return default;
             }
         } 
-        
+        public static bool TryGet<T>(out T service) where T : class
+        {
+            if (_services.ContainsKey(typeof(T)))
+            {
+                service = (T)_services[typeof(T)];
+                return true;
+            }
+            
+            service = null;
+            return false;
+        }
         
     }
 

@@ -1,60 +1,102 @@
 using UnityEngine;
-using System.Collections.Generic;
+using System.Collections.Generic; 
 using System.Linq;
 
 namespace Homebound.Features.Economy
 {
     public class UnitInventory : MonoBehaviour, IInventory
     {
-        //Variable
-        [Header("Mochila")]
-        [SerializeField] private List<InventorySlot> _backpack = new List<InventorySlot>();
-        [SerializeField] private int _maxSlots = 5;
+        [Header("Configuración")]
+        [SerializeField] private int _maxCapacity = 20;
+        [SerializeField] private List<InventorySlot> _slots = new List<InventorySlot>();
+
         
-        // Metodos
+        public bool IsEmpty => _slots.Count == 0;
+
+       
+        //Metodos
+        public void ConfigureCapacity(int newCapacity)
+        {
+            _maxCapacity = newCapacity;
+        }
+
+        public void Clear()
+        {
+            _slots.Clear();
+        }
+
+
         public int Add(ItemData item, int amount)
         {
-            var existingSlot = _backpack.FirstOrDefault(s => s.Item == item);
-            if (existingSlot != null)
+            // Lógica simple de añadir (puedes refinarla luego con MaxStack)
+            var slot = _slots.FirstOrDefault(s => s.Item == item);
+            if (slot != null)
             {
-                existingSlot.Add(amount);
-                return 0;
+                slot.Add(amount);
             }
-
-            if (_backpack.Count < _maxSlots)
+            else
             {
-                _backpack.Add(new InventorySlot(item, amount));
-                return 0;
+                if (_slots.Count >= _maxCapacity) return amount; 
+                _slots.Add(new InventorySlot(item, amount));
             }
-            //Mochila llena
-            Debug.LogWarning($"{{name}}: ¡Mochila llena! No puedo recoger {{item.DisplayName}}");
-            return amount;
+            return 0; // Todo guardado (0 sobrante)
         }
 
         public bool Remove(ItemData item, int amount)
         {
-            var slot = _backpack.FirstOrDefault(s => s.Item == item);
+            var slot = _slots.FirstOrDefault(s => s.Item == item);
             if (slot != null && slot.Amount >= amount)
             {
                 slot.Remove(amount);
-                if (slot.IsEmpty) _backpack.Remove(slot);
+                if (slot.IsEmpty) _slots.Remove(slot);
                 return true;
             }
             return false;
         }
-        
+
         public bool Has(ItemData item, int amount)
         {
-            var slot = _backpack.FirstOrDefault(s => s.Item == item);
+            var slot = _slots.FirstOrDefault(s => s.Item == item);
             return slot != null && slot.Amount >= amount;
         }
         
-        public int Count(ItemData item)
+        public bool HasItem(ItemData item, int amount) => Has(item, amount); // Alias
+
+        public bool TryConsume(ItemData item, int amount)
         {
-            var slot = _backpack.FirstOrDefault(s => s.Item == item);
-            return slot != null ? slot.Amount : 0;
+            if (Has(item, amount))
+            {
+                Remove(item, amount);
+                return true;
+            }
+            return false;
         }
 
-    }
+        public int Count(ItemData item)
+        {
+            var slot = _slots.FirstOrDefault(s => s.Item == item);
+            return slot != null ? slot.Amount : 0;
+        }
+        
+        public bool TransferAllTo(StorageContainer container)
+        {
+            if (container == null || IsEmpty) return false;
 
+            bool anyTransfer = false;
+
+            for (int i = _slots.Count - 1; i >= 0; i--)
+            {
+                InventorySlot slot = _slots[i];
+                
+                // Intentamos depositar en el contenedor
+                if (container.DepositItem(slot.Item, slot.Amount))
+                {
+                    _slots.RemoveAt(i); 
+                    anyTransfer = true;
+                }
+            }
+
+            return anyTransfer;
+        }
+    }
 }

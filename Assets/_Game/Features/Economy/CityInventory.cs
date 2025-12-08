@@ -6,87 +6,77 @@ using Homebound.Core;
 
 namespace Homebound.Features.Economy
 {
+    //Gestiona los recursos globales de la ciudad.
     public class CityInventory : MonoBehaviour, IInventory
     {
-        
+
         //Variables
-        [Header("Almacen Global")]
-        [SerializeField] private List<InventorySlot> _slots = new List<InventorySlot>();
+        private Dictionary<ItemData, int> _resourceDatabase = new Dictionary<ItemData, int>();
+
+        [Header("Debug View (Read Only)")]
+        [SerializeField] private List<InventorySlot> _debugInventoryView = new List<InventorySlot>();
 
         public event Action OnInventoryUpdated;
-        
+
         
         //Metodos
         private void Awake()
         {
             ServiceLocator.Register<CityInventory>(this);
         }
-        
-        private void Start()
-        {
-            // --- DEBUG / CHEAT DE INICIO ---
-            // Le regalamos 50 de cada item posible para probar la construcción
-            Debug.LogWarning("💰 [DEBUG] CityInventory: Añadiendo recursos iniciales de prueba.");
-            
-            // Busca todos los ItemData en tu carpeta de recursos (Resources_Data)
-            // Asegúrate de que tus ScriptableObjects estén en una carpeta dentro de Resources si usas Resources.Load
-            // O mejor, arrástralos en una lista en el inspector si prefieres.
-            
-            // FORMA RÁPIDA (Si tienes la lista _slots visible en inspector):
-            // Simplemente añade manualmente en el Inspector del objeto _System -> CityInventory
-            // Elemento 0: Item: Stone, Cantidad: 50.
-            // Elemento 1: Item: Dirt, Cantidad: 50.
-        }
 
         private void OnDestroy()
         {
             ServiceLocator.Unregister<CityInventory>();
         }
-        
+
         
 
         public int Add(ItemData item, int amount)
         {
-            var existingSlot = _slots.FirstOrDefault(s => s.Item == item);
+            if (item == null || amount <= 0) return 0;
 
-            if (existingSlot != null)
+            if (_resourceDatabase.ContainsKey(item))
             {
-                existingSlot.Add(amount);
+                _resourceDatabase[item] += amount;
             }
             else
             {
-                _slots.Add(new InventorySlot(item, amount));
+                _resourceDatabase.Add(item, amount);
             }
 
+            UpdateDebugView();
             OnInventoryUpdated?.Invoke();
-            // Debug.Log($"[CityInventory] Añadido {amount} de {item.DisplayName}.");
+            
+            Debug.Log($"[CityInventory] Reino ganó: {amount} {item.DisplayName}. Total: {_resourceDatabase[item]}");
             return 0; 
         }
 
         public bool Remove(ItemData item, int amount)
         {
             if (!Has(item, amount)) return false;
+
+            _resourceDatabase[item] -= amount;
+
             
-            var slot = _slots.FirstOrDefault(s => s.Item == item);
-            if (slot != null)
+            if (_resourceDatabase[item] <= 0)
             {
-                slot.Remove(amount);
-                if (slot.IsEmpty) _slots.Remove(slot);
-                OnInventoryUpdated?.Invoke();
-                return true;
+                _resourceDatabase.Remove(item);
             }
-            return false;
+
+            UpdateDebugView();
+            OnInventoryUpdated?.Invoke();
+            return true;
         }
 
         public bool Has(ItemData item, int amount)
         {
-            return Count(item) >= amount;
+            if (item == null) return false;
+            return _resourceDatabase.ContainsKey(item) && _resourceDatabase[item] >= amount;
         }
 
-        
         public bool HasItem(ItemData item, int amount) => Has(item, amount);
 
-        
         public bool TryConsume(ItemData item, int amount)
         {
             if (Has(item, amount))
@@ -99,8 +89,37 @@ namespace Homebound.Features.Economy
 
         public int Count(ItemData item)
         {
-            var slot = _slots.FirstOrDefault(s => s.Item == item);
-            return slot != null ? slot.Amount : 0;
+            if (item == null) return 0;
+            return _resourceDatabase.ContainsKey(item) ? _resourceDatabase[item] : 0;
+        }
+
+        public Dictionary<ItemData, int> GetAllItems()
+        {
+            return new Dictionary<ItemData, int>(_resourceDatabase);
+        }
+
+        // METODOS DE DEBUG
+
+        private void UpdateDebugView()
+        {
+            // Solo actualizamos la lista si estamos en el editor para evitar Garbage Collection innecesario en builds
+#if UNITY_EDITOR
+            _debugInventoryView.Clear();
+            foreach (var kvp in _resourceDatabase)
+            {
+                _debugInventoryView.Add(new InventorySlot(kvp.Key, kvp.Value));
+            }
+#endif
+        }
+        
+        // Método Cheat para Debug
+        [ContextMenu("Add Test Resources")]
+        public void DebugAddResources()
+        {
+            Debug.LogWarning("💰 [CHEAT] Añadiendo recursos de prueba...");
+            // Aquí idealmente cargarías items de una carpeta Resources, 
+            // pero como no tenemos referencias directas, esto es solo un placeholder
+            // para que lo llames manualmente si tienes referencias.
         }
     }
 }

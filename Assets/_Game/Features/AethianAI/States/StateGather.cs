@@ -1,146 +1,252 @@
-using System;
 using UnityEngine;
 using Homebound.Core;
 using Homebound.Features.Economy;
+using System.Linq; 
 
 namespace Homebound.Features.AethianAI
 {
     public class StateGather : AethianState
     {
-        //Variables
-        private enum GatherPhase{ MovingToNode, Chopping, ReturningToBase}
+        
+        private enum GatherPhase { MovingToNode, Working, ReturningToBase, Depositing }
 
         private GatherPhase _phase;
-        private IGatherable _currentNode;
-        private float _chopTimer;
-        private const float CHOP_INTERVAL = 1.0f;
-        private const float CHOP_POWER = 20f;
         
-        //Referencias cacheadas
+        // Referencias al objetivo actual
+        private IGatherable _targetNode;
+        private IReservable _targetReservable;
+        
+        // Configuración de trabajo
+        private float _workTimer;
+        private const float WORK_INTERVAL = 1.0f; 
+        private const float WORK_POWER = 20f;     
+        
+        // Referencias propias
         private UnitInventory _myInventory;
-        private CityInventory _cityInventory;
-        
-        public StateGather(AethianBot bot) : base(bot) {}
-        
-        //Metodos
-        // ReSharper disable Unity.PerformanceAnalysis
+
+        public StateGather(AethianBot bot) : base(bot) { }
+
         public override void Enter()
         {
             _myInventory = _bot.GetComponent<UnitInventory>();
-            _cityInventory = ServiceLocator.Get<CityInventory>();
 
+            
             if (_bot.CurrentJob == null || _bot.CurrentJob.Target == null)
             {
+                Debug.LogWarning("[StateGather] Tarea inválida o sin objetivo.");
                 _bot.ChangeState(_bot.StateIdle);
                 return;
+            }
+
+            
+            _targetNode = _bot.CurrentJob.Target.GetComponent<IGatherable>();
+            _targetReservable = _bot.CurrentJob.Target.GetComponent<IReservable>();
+
+            if (_targetNode == null)
+            {
+                Debug.LogError("[StateGather] El objetivo no es 'IGatherable'.");
+                _bot.ChangeState(_bot.StateIdle);
+                return;
+            }
+
+            
+            if (_targetReservable != null)
+            {
+                if (!_targetReservable.CanReserve)
+                {
+                    Debug.Log("[StateGather] El nodo está lleno de trabajadores. Cancelando.");
+                    // Aquí idealmente devolveríamos la tarea al JobManager para que otro la tome luego
+                    _bot.CurrentJob = null; 
+                    _bot.ChangeState(_bot.StateIdle);
+                    return;
+                }
+                
+                
+                _targetReservable.Reserve(_bot.gameObject);
+            }
+
+            // 4. Iniciar movimiento
+            _phase = GatherPhase.MovingToNode;
+            _bot.MoveTo(_targetNode.Position);
+            // Debug.Log($"[StateGather] Viajando a {_targetNode.Name}...");
+        }
+
+        public override void Exit()
+        {
+            
+            if (_targetReservable != null)
+            {
+                _targetReservable.Release(_bot.gameObject);
             }
             
-            _currentNode = _bot.CurrentJob.Target.GetComponent<IGatherable>();
-
-            if (_currentNode == null)
-            {
-                Debug.LogError("[StateGather] El objetivo no es recolectable");
-                _bot.ChangeState(_bot.StateIdle);
-                return;
-            }
-
-            _phase = GatherPhase.MovingToNode;
-            _bot.MoveTo(_currentNode.GetPosition());
-            Debug.Log($"[Gather] Yendo a talar: {_currentNode.Name}");
+            _bot.StopMoving();
         }
 
         public override void Tick()
         {
+            
+            if (_phase != GatherPhase.ReturningToBase && (_targetNode == null || _targetNode.Equals(null)))
+            {
+                Debug.Log("[StateGather] El nodo desapareció. Volviendo a casa si tengo carga.");
+                CheckInventoryAndReturn();
+                return;
+            }
+
             switch (_phase)
             {
                 case GatherPhase.MovingToNode:
                     if (_bot.HasReachedDestination())
                     {
-                        StartChopping();
+                        StartWorking();
                     }
                     break;
-                case GatherPhase.Chopping:
-                    ProcessChopping();
+
+                case GatherPhase.Working:
+                    ProcessWorking();
                     break;
+
                 case GatherPhase.ReturningToBase:
                     if (_bot.HasReachedDestination())
                     {
-                        DepositResources();
+                        _phase = GatherPhase.Depositing; 
+                        DepositLoad();
                     }
                     break;
             }
         }
 
-        private void StartChopping()
+        private void StartWorking()
         {
-            _phase = GatherPhase.Chopping;
+            _phase = GatherPhase.Working;
             _bot.StopMoving();
-            _chopTimer = 0f;
-            Debug.Log($"[Gather] Comenzando a talar: {_currentNode.Name}");
+            _workTimer = 0f;
+            
+            _bot.transform.LookAt(_bot.CurrentJob.Target.position);
         }
 
-        // ReSharper disable Unity.PerformanceAnalysis
-        private void ProcessChopping()
+        private void ProcessWorking()
         {
-            if (_currentNode == null || _currentNode.Transform == null)
+            _workTimer += Time.deltaTime;
+            
+            // Ciclo de golpe
+            if (_workTimer >= WORK_INTERVAL)
             {
-                ReturnToBase();
+                _workTimer = 0f;
+                PerformGatherHit();
+            }
+        }
+
+        private void PerformGatherHit()
+        {
+            if (_targetNode == null || _targetNode.IsDepleted)
+            {
+                CheckInventoryAndReturn();
                 return;
             }
 
-            _chopTimer += Time.deltaTime;
-            while (_chopTimer >= CHOP_INTERVAL)
-            {
-                _chopTimer -= CHOP_INTERVAL;
-                PerformChopHit();
+            // 1. Recolección Física (Devuelve int)
+            int harvestedAmount = _targetNode.Gather(WORK_POWER);
 
-                if (_currentNode == null || _currentNode.Transform == null) return;
-            }
-        }
-
-        private void PerformChopHit()
-        {
-            bool destroyed = _currentNode.Gather(CHOP_POWER);
-            if (destroyed)
+            // 2. Guardado en Inventario Local
+            if (harvestedAmount > 0 && _myInventory != null)
             {
-                InventorySlot loot = _currentNode.GetDrop();
-                if (_myInventory != null)
+                
+                if (_targetNode is ResourceNode concreteNode) 
                 {
-                    int leftOver = _myInventory.Add(loot.Item, loot.Amount);
-                    if (leftOver > 0) Debug.Log("Mochila llena! Se desperdiciaron recursos");
-                    else Debug.Log($"[Gather] Recogido {loot.Amount} de {loot.Item.DisplayName}");
+                    // Hack temporal seguro: obtenemos el tipo del drop configurado
+                    var dropInfo = concreteNode.GetDrop(); 
+                    int leftovers = _myInventory.Add(dropInfo.Item, harvestedAmount);
+                    
+                    if (leftovers > 0)
+                    {
+                        // Mochila llena
+                        Debug.Log("[StateGather] ¡Mochila llena!");
+                        CheckInventoryAndReturn();
+                    }
                 }
+            }
 
-                ReturnToBase();
+            
+            if (_targetNode.IsDepleted)
+            {
+                CheckInventoryAndReturn();
             }
         }
 
-        private void ReturnToBase()
+        private void CheckInventoryAndReturn()
         {
-            _phase = GatherPhase.ReturningToBase;
-
-            if (_cityInventory != null)
+            
+            if (_myInventory != null && !_myInventory.IsEmpty)
             {
-                Vector3 basePos = _cityInventory.transform.position;
-                
-                Vector3 approachPos = basePos + (_bot.transform.position - basePos).normalized * 2f;
-                approachPos.y = _bot.transform.position.y;
-                
-                _bot.MoveTo(approachPos);
-                Debug.Log("[Gather] Mochila llena -  Trabajo listo. Volviendo al almacen");
+                FindAndMoveToStorage();
             }
             else
             {
-                _bot.ChangeState(_bot.StateIdle);
+                CompleteJob();
             }
         }
-        
-        private void DepositResources()
+
+        private void FindAndMoveToStorage()
         {
-            Debug.Log("[Gather] Recursos depositados en la ciudad");
+            
+            
+            var allStorages = Object.FindObjectsByType<StorageContainer>(FindObjectsSortMode.None);
+            
+            
+            var nearestStorage = allStorages
+                .OrderBy(s => Vector3.Distance(_bot.Position, s.transform.position))
+                .FirstOrDefault();
+
+            if (nearestStorage != null)
+            {
+                _phase = GatherPhase.ReturningToBase;
+                _bot.MoveTo(nearestStorage.GetDropOffPoint());
+                
+            }
+            else
+            {
+                Debug.LogWarning("[StateGather] ¡No hay almacenes! El bot se queda con los recursos.");
+                CompleteJob(); 
+            }
+        }
+
+        private void DepositLoad()
+        {
+            // Buscamos contenedores cercanos
+            var colliders = Physics.OverlapSphere(_bot.Position, 2.5f); // Radio un poco mayor para asegurar contacto
+            
+            foreach (var col in colliders)
+            {
+                var container = col.GetComponent<StorageContainer>();
+                if (container != null)
+                {
+                    // ¡ENCONTRADO! Procedemos a transferir
+                    Debug.Log($"[StateGather] {_bot.name} depositando en {container.name}...");
+                    
+                    bool success = _myInventory.TransferAllTo(container);
+                    
+                    if (success)
+                    {
+                        Debug.Log($"[StateGather] ✅ Depósito completado con éxito.");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[StateGather] ⚠️ No se pudo depositar (¿Almacén lleno?).");
+                    }
+                    
+                    break; // Ya encontramos uno, no seguimos buscando
+                }
+            }
+
+            CompleteJob();
+        }
+
+        private void CompleteJob()
+        {
             _bot.CurrentJob = null;
             _bot.ChangeState(_bot.StateIdle);
         }
+        
+        
     }
-
 }
