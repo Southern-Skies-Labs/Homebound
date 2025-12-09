@@ -1,71 +1,43 @@
-using System;
 using UnityEngine;
 using Homebound.Core;
 
-    
 namespace Homebound.Features.TimeSystem
 {
     public class DayNightController : MonoBehaviour
     {
-        
-        //Variables
-        [Header("Referencias")] 
         [SerializeField] private Light _directionalLight;
-        [SerializeField] private TimeManager _timeManager;
+        [SerializeField] private Gradient _ambientColor;
+        [SerializeField] private Gradient _directionalColor;
+        [SerializeField] private Gradient _fogColor;
 
-        [Header("Configuración visual")] 
-        [SerializeField] private Color _dayAmbient = Color.white;
-        [SerializeField] private Color _nightAmbient = new Color(0.1f, 0.1f, 0.2f);
+        private TimeManager _timeManager;
 
-        [SerializeField] private AnimationCurve _lightIntensityCurve;
-        
-        //Metodos
         private void Start()
         {
-            if (_timeManager == null)
-            {
-                _timeManager = ServiceLocator.Get<TimeManager>();
-            }
-
-            if (_lightIntensityCurve.length == 0)
-            {
-                _lightIntensityCurve = new AnimationCurve(
-                    new Keyframe(0,0),
-                    new Keyframe(6,0.2f),
-                    new Keyframe(12,1),
-                    new Keyframe(18, 0.2f),
-                    new Keyframe(24, 0)
-                    );
-            }
+            _timeManager = ServiceLocator.Get<TimeManager>();
         }
 
         private void Update()
         {
             if (_timeManager == null) return;
-
-            UpdateSunPosition(_timeManager.CurrentHour);
-            UpdateAmbientLight(_timeManager.CurrentHour);
-        }
-
-        private void UpdateSunPosition(float time)
-        {
-            float alpha = time / 24.0f;
-            float sunRotation = Mathf.Lerp(-90, 270, alpha);
             
-            _directionalLight.transform.rotation = Quaternion.Euler(sunRotation, -30f, 0);
+            float timePercent = _timeManager.NormalizedDayTime;
+
+            UpdateLighting(timePercent);
         }
 
-        private void UpdateAmbientLight(float time)
+        private void UpdateLighting(float timePercent)
         {
-            float intensity = _lightIntensityCurve.Evaluate(time);
+            if (_directionalLight != null)
+            {
+                // Rotar sol: 0 (Medianoche) -> -90, 0.5 (Mediodía) -> 90
+                float sunAngle = (timePercent * 360f) - 90f;
+                _directionalLight.transform.localRotation = Quaternion.Euler(sunAngle, 170f, 0);
+                _directionalLight.color = _directionalColor.Evaluate(timePercent);
+            }
 
-            _directionalLight.intensity = intensity;
-            
-            Color targetColor = intensity > 0.1f ? _dayAmbient : _nightAmbient;
-            RenderSettings.ambientLight = Color.Lerp(RenderSettings.ambientLight, targetColor, Time.deltaTime * 2f);
-
+            RenderSettings.ambientLight = _ambientColor.Evaluate(timePercent);
+            RenderSettings.fogColor = _fogColor.Evaluate(timePercent);
         }
-    
     }
-    
 }

@@ -1,5 +1,3 @@
-using UnityEngine;
-
 namespace Homebound.Features.TimeSystem
 {
     public enum Season
@@ -9,5 +7,4 @@ namespace Homebound.Features.TimeSystem
         Autumn = 2,
         Winter = 3
     }
-
 }

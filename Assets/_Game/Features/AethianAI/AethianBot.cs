@@ -5,7 +5,7 @@ using System;
 using Homebound.Features.TimeSystem;
 using Homebound.Core;
 using Homebound.Features.Identity;
-using Homebound.Features.Navigation; 
+using Homebound.Features.Navigation;
 
 namespace Homebound.Features.AethianAI
 {
@@ -19,6 +19,8 @@ namespace Homebound.Features.AethianAI
         
         [Header("Debug")]
         [SerializeField] private string _currentStateName;
+
+        [Header("Behavior")] public ScheduleProfile Schedule;
         
         private TimeManager _timeManager;
         private float _lastHourCheck;
@@ -101,7 +103,7 @@ namespace Homebound.Features.AethianAI
 
             if (_timeManager != null)
             {
-                _lastHourCheck = _timeManager.CurrentHour;
+                _lastHourCheck = _timeManager.CurrentTime.Hour;
             }
             else
             {
@@ -122,7 +124,7 @@ namespace Homebound.Features.AethianAI
             // 1. Metabolismo
             if (_timeManager != null)
             {
-                float currentHour = _timeManager.CurrentHour;
+                float currentHour = _timeManager.CurrentTime.Hour;
                 float deltaHours = currentHour - _lastHourCheck;
                 if (deltaHours < 0) deltaHours += 24f; 
 
@@ -179,21 +181,108 @@ namespace Homebound.Features.AethianAI
         // ReSharper disable Unity.PerformanceAnalysis
         private void CheckGlobalTransitions()
         {
-            if(ShouldIgnoreHunger()) return;
+            if (_timeManager == null || Schedule == null) return;
+            
+            int currentHour = _timeManager.CurrentTime.Hour;
+            ActivityType scheduledActivity = Schedule.GetActivityAt(currentHour);
+            
+            // Prioridad 1: COMBATE / AMENAZA (Futuro)
+            // if (CombatManager.IsUnderAttack) { ChangeState(StateCombat); return; }
 
-            bool isNight = _timeManager != null && (_timeManager.CurrentHour >= 20 || _timeManager.CurrentHour < 6);
-            if (Stats.Energy.IsCritical() || isNight)
+            // Prioridad 2: SUEÑO SAGRADO (Por Horario)
+            if (scheduledActivity == ActivityType.Sleep)
             {
-                if (!(_currentState is StateSleep)) ChangeState(StateSleep);
+                if (!(_currentState is StateSleep))
+                {
+                    ChangeState(StateSleep);
+                }
+                return; 
+            }
+            
+            if (_currentState is StateSleep && scheduledActivity != ActivityType.Sleep)
+            {
+                Debug.Log($"[Aethian] {name}: ¡Ring Ring! Hora de levantarse.");
+                ChangeState(StateIdle); 
             }
 
+            // Prioridad 3: SUPERVIVENCIA (Hambre/Sed)
             if (Stats.Hunger.IsCritical() && !(_currentState is StateSurvival))
             {
-                Debug.LogWarning($"[Aethian] {name} tiene hambre critica!");
+                Debug.LogWarning($"[Aethian] {name}: Hambre crítica ({Stats.Hunger.Value:F1}%). Buscando comida.");
                 ChangeState(StateSurvival);
+                return; 
+            }
+
+            // Prioridad 4: AHORRO DE ENERGÍA (Agotamiento)
+            bool isExhausted = Stats.Energy.Value <= 10f;
+            if (isExhausted)
+            {
+                if (_currentState is StateWorking)
+                {
+                    Debug.Log($"[Aethian] {name}: Estoy agotado ({Stats.Energy.Value:F1}%). Dejo de trabajar por hoy.");
+                    
+                    if (CurrentJob != null)
+                    {
+                        var jobManager = ServiceLocator.Get<JobManager>();
+                        jobManager?.ReturnJob(CurrentJob); 
+                        CurrentJob = null;
+                    }
+                    
+                    ChangeState(StateIdle);
+                }
+                scheduledActivity = ActivityType.Leisure;
+            }
+
+            // Prioridad 5: RUTINA (Trabajo vs Ocio)
+            if (scheduledActivity == ActivityType.Work)
+            {
+                // Si ya tengo trabajo y estoy trabajándolo, bien.
+                if (CurrentJob != null)
+                {
+                    // DISCRIMINACIÓN DE ESTADO SEGÚN TIPO DE TRABAJO
+                    // Si es Talar o Recolectar -> Usar StateGather (El que tiene la lógica de distancia y recursos)
+                    if (CurrentJob.JobType == JobType.Gather || CurrentJob.JobType == JobType.Chop)
+                    {
+                        if (!(_currentState is StateGather))
+                        {
+                            ChangeState(StateGather);
+                        }
+                    }
+                    // Si es Construir -> Usar StateBuilding (Futuro)
+                    else if (CurrentJob.JobType == JobType.Build)
+                    {
+                        if (!(_currentState is StateBuilding))
+                        {
+                            ChangeState(StateBuilding);
+                        }
+                    }
+                    // Para todo lo demás (Mover, Craft, etc.) -> Usar el genérico StateWorking
+                    else 
+                    {
+                        if (!(_currentState is StateWorking))
+                        {
+                            ChangeState(StateWorking);
+                        }
+                    }
+                }
+            }
+            // Caso B: Toca OCIO (Leisure)
+            else if (scheduledActivity == ActivityType.Leisure)
+            {
+                // ... (Misma lógica de antes: soltar trabajo y ponerse en Idle) ...
+                if (_currentState is StateWorking)
+                {
+                    if (CurrentJob != null)
+                    {
+                        var jobManager = ServiceLocator.Get<JobManager>();
+                        jobManager?.ReturnJob(CurrentJob);
+                        CurrentJob = null;
+                    }
+                    ChangeState(StateIdle);
+                }
             }
         }
-        
+
         protected virtual bool ShouldIgnoreHunger() => false;
 
         public void ChangeState(AethianState newState)
@@ -207,6 +296,16 @@ namespace Homebound.Features.AethianAI
             OnStateChanged?.Invoke(stateName);
             
             _currentState.Enter();
+        }
+        
+        public bool IsAvailable()
+        {
+            // Solo disponible si estoy en estado Working (o Idle queriendo trabajar)
+            // Y NO estoy agotado
+            if (Stats.Energy.Value <= 10f) return false;
+            
+            // Y si es horario laboral (opcional, pero StateWorking ya filtra esto)
+            return true; 
         }
         
         private void AssignRandomIdentity()

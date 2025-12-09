@@ -27,9 +27,12 @@ namespace Homebound.Features.Economy
         [Header("Settings")]
         public ItemType Type;
         public int MaxStack = 99;
+        public bool IsStackeable = true;
 
         [Header("Consumable")] 
-        public float NutritionValue;
+        public float NutritionValue = 10f;
+
+        [Tooltip("Multiplicador de saciedad")] public float SaturationValue = 1.0f;
     }
 
 }

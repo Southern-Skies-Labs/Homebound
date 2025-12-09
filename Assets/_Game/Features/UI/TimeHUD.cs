@@ -1,7 +1,5 @@
-using System;
 using UnityEngine;
-using TMPro;
-using UnityEngine.UI;
+using TMPro; 
 using Homebound.Core;
 using Homebound.Features.TimeSystem;
 
@@ -9,63 +7,45 @@ namespace Homebound.Features.UI
 {
     public class TimeHUD : MonoBehaviour
     {
-        //Variables
-        [Header("UI References")]
         [SerializeField] private TextMeshProUGUI _timeText;
-        [SerializeField] private TextMeshProUGUI _dayText;
-        [SerializeField] private Image _dayNightBar;
+        [SerializeField] private TextMeshProUGUI _dateText;
         
         private TimeManager _timeManager;
-        
-        //Metodos
 
         private void Start()
         {
             _timeManager = ServiceLocator.Get<TimeManager>();
+            
             if (_timeManager != null)
             {
-                _timeManager.OnHourChanged += UpdateTimeText;
-                _timeManager.OnDayChanged += UpdateDayText;
+                _timeManager.OnMinuteChanged += UpdateUI;
                 
-                UpdateDayText(_timeManager.CurrentDay);
-                UpdateTimeText((int)_timeManager.CurrentHour);
+                UpdateUI(_timeManager.CurrentTime);
             }
         }
 
         private void OnDestroy()
         {
-            if (_timeManager!= null)
+            if (_timeManager != null)
             {
-                _timeManager.OnHourChanged -= UpdateTimeText;
-                _timeManager.OnDayChanged -= UpdateDayText;
+                _timeManager.OnMinuteChanged -= UpdateUI;
             }
         }
 
-        private void Update()
+        private void UpdateUI(GameDateTime time)
         {
-            if (_timeManager != null && _dayNightBar != null)
+            // Formato reloj digital: "08:05"
+            _timeText.text = $"{time.Hour:00}:{time.Minute:00}";
+            
+            _dateText.text = $"{time.Season}, Day {time.Day} (Y{time.Year})";
+        }
+        
+        public void SetSpeed(float speed)
+        {
+            if (_timeManager != null)
             {
-                _dayNightBar.fillAmount = _timeManager.CurrentHour / 24f;
+                _timeManager.SetTimeScale(speed);
             }
         }
-
-        private void UpdateTimeText(int hour)
-        {
-            if (_timeText != null) _timeText.text = $"{hour:00}:00";
-        }
-
-        private void UpdateDayText(int day)
-        {
-            if (_dayText != null) _dayText.text = $"Día {day}";
-        }
-
-        public void SetTimeScale(float scale)
-        {
-            Time.timeScale = scale;
-            Debug.Log($"[TimeHUD] Velocidad: x{scale}");
-        }
-        
-        
-        
     }
 }

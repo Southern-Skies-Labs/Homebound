@@ -19,14 +19,19 @@ namespace Homebound.Features.CameraSystem
         [SerializeField] private float _rotationSpeed = 100f;
         [SerializeField] private float _smoothTime = 0.1f;
         
+        [Header("Terrain Following")]
+        [SerializeField] private LayerMask _groundLayer; 
+        [SerializeField] private float _heightOffset = 0f; 
+        [SerializeField] private float _heightDamping = 5f; 
+        
         [Header("Settings Zoom Hibrido")]
         [SerializeField] private float _zoomStep = 5f;
         [SerializeField] private float _minZoomDist = 2f;
         [SerializeField] private float _maxZoomDist = 30f;
         [SerializeField] private float _zoomDamping = 5f;
 
-        [Header("Transición inmersiva")] [SerializeField]
-        private AnimationCurve _pitchCurve;
+        [Header("Transición inmersiva")] 
+        [SerializeField] private AnimationCurve _pitchCurve;
 
         private RTSInputs _input;
         private Vector3 _targetPos;
@@ -34,22 +39,20 @@ namespace Homebound.Features.CameraSystem
         private float _currentZoomDist;
         private float _targetZoomDist;
         private Vector3 _refVelocityPos;
-        
+        private float _currentHeight; 
         
         //Metodos
         private void Awake()
         {
             _input = new RTSInputs();
             
-            //Inicializamos objetivos con la posicón actual del rig de la escena
             _targetPos = _rigRoot.position;
             _targetRot = _rigRoot.rotation;
+            _currentHeight = _rigRoot.position.y;
             
-            //Inicializamos el Zoom a una distancia media
             _targetZoomDist = (_maxZoomDist + _minZoomDist) / 2;
             _currentZoomDist = _targetZoomDist;
             
-            //Convifugración de seguridad
             if (_pitchCurve.length == 0)
             {
                 _pitchCurve = new AnimationCurve(new Keyframe(0, 10), new Keyframe(1, 60));
@@ -66,20 +69,19 @@ namespace Homebound.Features.CameraSystem
         private void Update()
         {
             HandleInput();
+            UpdateTargetHeight(); 
             MoveRig();
             HandleHybridZoom();
         }
         
         private void HandleInput()
         {
-            //Movimiento WASD
+            //Movimiento WASD (Plano XZ)
             Vector2 moveInput = _input.Gameplay.Move.ReadValue<Vector2>();
             
-            //Calcula dirección relativa a donde mira el RIG
             Vector3 forward = _rigRoot.forward;
             Vector3 right = _rigRoot.right;
             
-            //Aplanamos vectores para no volar cuando nos movemos
             forward.y = 0;
             right.y = 0;
             forward.Normalize();
@@ -89,10 +91,8 @@ namespace Homebound.Features.CameraSystem
 
             if (moveInput.sqrMagnitude > 0.001f)
             {
-                Vector3 oldPos = _targetPos;
                 _targetPos += moveDir * _moveSpeed * Time.unscaledDeltaTime;    
             }
-            
             
             //Rotación Q/E
             float rotInput = _input.Gameplay.Rotate.ReadValue<float>();
@@ -100,7 +100,6 @@ namespace Homebound.Features.CameraSystem
             {
                 _targetRot *= Quaternion.Euler(0, rotInput * _rotationSpeed * Time.unscaledDeltaTime, 0);
             }
-            
             
             // Zoom del Scroll
             float scroll = _input.Gameplay.Zoom.ReadValue<float>();
@@ -110,12 +109,20 @@ namespace Homebound.Features.CameraSystem
                 _targetZoomDist += zoomDir * _zoomStep;
                 _targetZoomDist = Mathf.Clamp(_targetZoomDist, _minZoomDist, _maxZoomDist);
             }
+        }
 
-            // if (Time.timeScale == 0 && moveInput != Vector2.zero)
-            // {
-            //     Debug.Log($"Input Recibido en pausa: {moveInput}");
-            // }
+        private void UpdateTargetHeight()
+        {
+            Vector3 rayOrigin = new Vector3(_targetPos.x, 100f, _targetPos.z);
             
+            if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, 200f, _groundLayer))
+            {
+                _targetPos.y = hit.point.y + _heightOffset;
+            }
+            else
+            {
+                _targetPos.y = 0f; 
+            }
         }
 
         private void MoveRig()
@@ -136,21 +143,13 @@ namespace Homebound.Features.CameraSystem
 
         private void HandleHybridZoom()
         {
-            //Componente Lerp del valor numerico del zoom
             _currentZoomDist = Mathf.Lerp(_currentZoomDist, _targetZoomDist, Time.unscaledDeltaTime * _zoomDamping);
             
-            //calculamos el porcentaje de zoom
             float t = Mathf.InverseLerp(_minZoomDist, _maxZoomDist, _currentZoomDist);
-            
-            // Evaluamos la curva para tener el angulo
             float targetPitch = _pitchCurve.Evaluate(t);
             
-            //Aplicamos la rotación al pivote para inclinar la cámara
             _pivot.localRotation = Quaternion.Euler(targetPitch, 0 ,0);
-            
-            //Aplicamos la distancia al target
             _target.localPosition = new Vector3(0, 0, -_currentZoomDist);
         }
     }
 }
-

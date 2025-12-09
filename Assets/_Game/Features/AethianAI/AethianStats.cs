@@ -15,20 +15,25 @@ namespace Homebound.Features.AethianAI
         [Header("Vitality")] 
         public float Health = 100f;
         public float MaxHealth = 100f;
+
+        [Header("Traits")] [Range(0.1f, 3f)] public float MetabolismRate = 1.0f;
+        
+        [Header("Attributes")]
+        public float GatheringPower = 1.0f;
         
         [Header("Needs")]
-        public Need Hunger = new Need("Hambre", 5f);
-        public Need Thirst = new Need("Sed", 8f);
-        public Need Energy = new Need("Energía", 3f);
+        public Need Hunger = new Need("Hambre", 10f);
+        public Need Thirst = new Need("Sed", 15f);
+        public Need Energy = new Need("Energía",  5f);
         
         public string GetFullName() => $"{CharacterName} <{Title}>";
 
-        // Reduce el hambre con el tiempo, retorna a true si murió de hambre.
-        public void UpdateNeeds(float gameHoursPassed)
+       
+        public void UpdateNeeds(float deltaGameHours)
         {
-            Hunger.Decay(gameHoursPassed);
-            Thirst.Decay(gameHoursPassed);
-            Energy.Decay(gameHoursPassed); 
+            Hunger.Decay(deltaGameHours * MetabolismRate);
+            Thirst.Decay(deltaGameHours * MetabolismRate);
+            Energy.Decay(deltaGameHours);
         }
     }
 }

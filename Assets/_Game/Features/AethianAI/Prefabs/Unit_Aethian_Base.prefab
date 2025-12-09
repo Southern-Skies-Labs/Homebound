@@ -48,8 +48,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 97ae1afaf737a0c4c8e29e04a32ad04e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _backpack: []
-  _maxSlots: 5
+  _maxCapacity: 20
+  _slots: []
 --- !u!65 &132296009371854640
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -101,8 +101,10 @@ MonoBehaviour:
   Stats:
     CharacterName: Aldeano
     Title: Errante
+    Class: 0
     Health: 100
     MaxHealth: 100
+    MetabolismRate: 1
     Hunger:
       Name: Hambre
       Value: 100
@@ -113,7 +115,7 @@ MonoBehaviour:
       Name: Sed
       Value: 100
       MaxValue: 100
-      DecayRate: 8
+      DecayRate: 5
       CriticalThreshold: 20
     Energy:
       Name: "Energ\xEDa"
@@ -122,6 +124,7 @@ MonoBehaviour:
       DecayRate: 3
       CriticalThreshold: 20
   _currentStateName: 
+  Schedule: {fileID: 11400000, guid: 0afbcb14833dc6d4ea52bc37b40ab2f4, type: 2}
 --- !u!1 &6058328310388587398
 GameObject:
   m_ObjectHideFlags: 0

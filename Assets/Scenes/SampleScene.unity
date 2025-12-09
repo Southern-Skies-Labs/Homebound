@@ -2008,7 +2008,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1336954042}
         m_TargetAssemblyTypeName: Homebound.Features.UI.TimeHUD, Homebound.Features.UI
-        m_MethodName: SetTimeScale
+        m_MethodName: SetSpeed
         m_Mode: 4
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -2219,15 +2219,96 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _directionalLight: {fileID: 410087040}
-  _timeManager: {fileID: 1442649151}
-  _dayAmbient: {r: 1, g: 1, b: 1, a: 1}
-  _nightAmbient: {r: 0.1, g: 0.1, b: 0.2, a: 1}
-  _lightIntensityCurve:
+  _ambientColor:
     serializedVersion: 2
-    m_Curve: []
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
+    key0: {r: 1, g: 1, b: 1, a: 1}
+    key1: {r: 1, g: 1, b: 1, a: 1}
+    key2: {r: 0, g: 0, b: 0, a: 0}
+    key3: {r: 0, g: 0, b: 0, a: 0}
+    key4: {r: 0, g: 0, b: 0, a: 0}
+    key5: {r: 0, g: 0, b: 0, a: 0}
+    key6: {r: 0, g: 0, b: 0, a: 0}
+    key7: {r: 0, g: 0, b: 0, a: 0}
+    ctime0: 0
+    ctime1: 65535
+    ctime2: 0
+    ctime3: 0
+    ctime4: 0
+    ctime5: 0
+    ctime6: 0
+    ctime7: 0
+    atime0: 0
+    atime1: 65535
+    atime2: 0
+    atime3: 0
+    atime4: 0
+    atime5: 0
+    atime6: 0
+    atime7: 0
+    m_Mode: 0
+    m_ColorSpace: -1
+    m_NumColorKeys: 2
+    m_NumAlphaKeys: 2
+  _directionalColor:
+    serializedVersion: 2
+    key0: {r: 1, g: 1, b: 1, a: 1}
+    key1: {r: 1, g: 1, b: 1, a: 1}
+    key2: {r: 0, g: 0, b: 0, a: 0}
+    key3: {r: 0, g: 0, b: 0, a: 0}
+    key4: {r: 0, g: 0, b: 0, a: 0}
+    key5: {r: 0, g: 0, b: 0, a: 0}
+    key6: {r: 0, g: 0, b: 0, a: 0}
+    key7: {r: 0, g: 0, b: 0, a: 0}
+    ctime0: 0
+    ctime1: 65535
+    ctime2: 0
+    ctime3: 0
+    ctime4: 0
+    ctime5: 0
+    ctime6: 0
+    ctime7: 0
+    atime0: 0
+    atime1: 65535
+    atime2: 0
+    atime3: 0
+    atime4: 0
+    atime5: 0
+    atime6: 0
+    atime7: 0
+    m_Mode: 0
+    m_ColorSpace: -1
+    m_NumColorKeys: 2
+    m_NumAlphaKeys: 2
+  _fogColor:
+    serializedVersion: 2
+    key0: {r: 1, g: 1, b: 1, a: 1}
+    key1: {r: 1, g: 1, b: 1, a: 1}
+    key2: {r: 0, g: 0, b: 0, a: 0}
+    key3: {r: 0, g: 0, b: 0, a: 0}
+    key4: {r: 0, g: 0, b: 0, a: 0}
+    key5: {r: 0, g: 0, b: 0, a: 0}
+    key6: {r: 0, g: 0, b: 0, a: 0}
+    key7: {r: 0, g: 0, b: 0, a: 0}
+    ctime0: 0
+    ctime1: 65535
+    ctime2: 0
+    ctime3: 0
+    ctime4: 0
+    ctime5: 0
+    ctime6: 0
+    ctime7: 0
+    atime0: 0
+    atime1: 65535
+    atime2: 0
+    atime3: 0
+    atime4: 0
+    atime5: 0
+    atime6: 0
+    atime7: 0
+    m_Mode: 0
+    m_ColorSpace: -1
+    m_NumColorKeys: 2
+    m_NumAlphaKeys: 2
 --- !u!4 &923471259
 Transform:
   m_ObjectHideFlags: 0
@@ -2919,8 +3000,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _timeText: {fileID: 2040413565}
-  _dayText: {fileID: 381111753}
-  _dayNightBar: {fileID: 1437365889}
+  _dateText: {fileID: 381111753}
 --- !u!114 &1336954043
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3360,6 +3440,7 @@ GameObject:
   - component: {fileID: 1442649154}
   - component: {fileID: 1442649155}
   - component: {fileID: 1442649156}
+  - component: {fileID: 1442649157}
   m_Layer: 0
   m_Name: _System
   m_TagString: Untagged
@@ -3418,10 +3499,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8fe99498b12cf294584e89c15f29d737, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  RealSecondsPerGameHour: 10
-  CurrentDay: 1
-  CurrentHour: 6
-  CurrentSeason: 0
+  _settings: {fileID: 11400000, guid: 337f6ae78409e744eaed7e4668f55d0f, type: 2}
+  _timeAccumulator: 0
+  _currentTime:
+    Year: 0
+    Season: 0
+    Day: 0
+    Hour: 0
+    Minute: 0
+  _isPaused: 0
 --- !u!114 &1442649152
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3482,6 +3568,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8ed66d3dfc9f23947a4623ebe6230bb1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1442649157
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1442649147}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8843278052cb03b43840740bd1f5796b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
 --- !u!1 &1547993433
@@ -3838,6 +3936,11 @@ MonoBehaviour:
   _moveSpeed: 20
   _rotationSpeed: 100
   _smoothTime: 0.1
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  _heightOffset: 0
+  _heightDamping: 5
   _zoomStep: 5
   _minZoomDist: 2
   _maxZoomDist: 30
@@ -4201,7 +4304,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1336954042}
         m_TargetAssemblyTypeName: Homebound.Features.UI.TimeHUD, Homebound.Features.UI
-        m_MethodName: SetTimeScale
+        m_MethodName: SetSpeed
         m_Mode: 4
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -4387,7 +4490,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1336954042}
         m_TargetAssemblyTypeName: Homebound.Features.UI.TimeHUD, Homebound.Features.UI
-        m_MethodName: SetTimeScale
+        m_MethodName: SetSpeed
         m_Mode: 4
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
