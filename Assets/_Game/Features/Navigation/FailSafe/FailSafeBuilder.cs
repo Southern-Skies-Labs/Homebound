@@ -41,15 +41,10 @@ namespace Homebound.Features.Navigation.FailSafe
 
             foreach (Vector3 pos in pathNodes)
             {
-                // CORRECCIÓN CRÍTICA:
-                // El pathNode es donde están los PIES del bot (Aire).
-                // La escalera debe ir DEBAJO de los pies (Suelo).
+                // Calculamos la posición DEBAJO del camino (donde va la escalera)
                 int targetY = Mathf.RoundToInt(pos.y) - 1; 
-                
-                // Obtenemos el nodo donde iría la escalera
                 PathNode floorNode = _gridManager.GetNode((int)pos.x, targetY, (int)pos.z);
                 
-                // Si ese suelo no existe o es aire, necesitamos construir ahí
                 if (floorNode != null && floorNode.Type == NodeType.Air)
                 {
                     nodesToBuild.Add(new Vector3Int((int)pos.x, targetY, (int)pos.z));
@@ -58,16 +53,29 @@ namespace Homebound.Features.Navigation.FailSafe
 
             foreach (Vector3Int buildPos in nodesToBuild)
             {
-                // 1. Instanciar Visual
-                // Usamos 0.5 en X/Z para centrar en el voxel, y Y normal (base del cubo)
                 Vector3 worldPos = new Vector3(buildPos.x + 0.5f, buildPos.y, buildPos.z + 0.5f); 
 
-                GameObject newLadder = Instantiate(_ladderPrefab, worldPos, Quaternion.identity, _ladderContainer);
-                
-                // 2. Actualizar Lógica
-                // Marcamos el nodo DEBAJO como Sólido. 
-                // Esto hace que el nodo ARRIBA (donde camina el bot) sea IsWalkableSurface = true.
+                // 1. Instanciar y Registrar
+                Instantiate(_ladderPrefab, worldPos, Quaternion.identity, _ladderContainer);
                 _gridManager.SetNode(buildPos.x, buildPos.y, buildPos.z, NodeType.Solid);
+
+                // 2. [CRÍTICO] EFECTO POP-UP
+                // Buscamos si hay algún bot atrapado justo en esta coordenada
+                // Usamos un cubo pequeño en el centro del bloque recién creado
+                Collider[] victims = Physics.OverlapBox(worldPos + Vector3.up * 0.5f, Vector3.one * 0.4f);
+                
+                foreach (var col in victims)
+                {
+                    // Buscamos el controlador de movimiento
+                    var botController = col.GetComponentInParent<UnitMovementController>();
+                    if (botController != null)
+                    {
+                        // ¡ELEVAMOS AL BOT!
+                        // Lo subimos 1 metro para que quede SOBRE la escalera, no dentro.
+                        botController.transform.position += Vector3.up * 1.05f; 
+                        Debug.Log($"[FailSafe] Bot {botController.name} elevado para evitar quedar enterrado.");
+                    }
+                }
 
                 yield return new WaitForSeconds(_buildDelayPerUnit);
             }

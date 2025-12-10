@@ -91,6 +91,9 @@ MonoBehaviour:
   _moveSpeed: 4
   _rotationSpeed: 10
   _collisionCheckDist: 0.6
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 65
 --- !u!114 &8238417413627897938
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -131,6 +134,7 @@ MonoBehaviour:
       CriticalThreshold: 20
   _currentStateName: 
   Schedule: {fileID: 11400000, guid: 0afbcb14833dc6d4ea52bc37b40ab2f4, type: 2}
+  _workTimer: 0
 --- !u!114 &-6130806857890670916
 MonoBehaviour:
   m_ObjectHideFlags: 0

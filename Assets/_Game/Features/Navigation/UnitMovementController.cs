@@ -14,7 +14,8 @@ namespace Homebound.Features.Navigation
         [Header("Configuración")]
         [SerializeField] private float _moveSpeed = 4.0f;
         [SerializeField] private float _rotationSpeed = 12.0f;
-        [SerializeField] private float _collisionCheckDist = 0.6f; // Distancia de frenado ante muros
+        [SerializeField] private float _collisionCheckDist = 0.6f;
+        [SerializeField] private LayerMask _groundLayer = 1;
 
         private PathfindingService _pathfindingService;
         private Coroutine _moveCoroutine;
@@ -34,33 +35,40 @@ namespace Homebound.Features.Navigation
             _rb.useGravity = false;
         }
         
-        // private void Update()
-        // {
-        //     // Si no nos estamos moviendo activamente por una ruta...
-        //     if (!IsMoving)
-        //     {
-        //         ApplyGravity();
-        //     }
-        // }
-        //
-        // private void ApplyGravity()
-        // {
-        //     // Raycast hacia abajo para ver si hay suelo
-        //     // Origen: Un poco arriba de los pies
-        //     Vector3 rayOrigin = transform.position + Vector3.up * 0.1f;
-        //
-        //     // Buscamos suelo a corta distancia (0.2f = 0.1 origen + 0.1 tolerancia)
-        //     if (!Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, 0.2f))
-        //     {
-        //         // ¡No hay suelo! Caemos.
-        //         // Usamos una velocidad de caída fija o acumulativa
-        //         float fallSpeed = 5.0f; 
-        //         transform.position += Vector3.down * fallSpeed * Time.deltaTime;
-        //     
-        //         // Opcional: Alinear al centro de la celda mientras cae para evitar quedar en bordes
-        //         // (Matemática de voxel centering)
-        //     }
-        // }
+        private void Update()
+        {
+            if (!IsMoving)
+            {
+                ApplyGravity();
+            }
+        }
+        
+        private void ApplyGravity()
+        {
+            // 1. Origen: Empezamos un poco arriba (cintura) para no fallar si el pivote está hundido
+            Vector3 rayOrigin = transform.position + Vector3.up * 0.5f;
+            
+            // 2. Distancia: 0.5 (bajar a los pies) + 0.6 (buscar suelo bajo los pies) = 1.1f
+            float checkDistance = 1.1f;
+
+            // 3. Raycast filtrado por Layer (Ignora al bot si está en layer Unit)
+            // Asegúrate de que _groundLayer incluya "Default" y "Terrain"
+            if (!Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, checkDistance, _groundLayer))
+            {
+                // CAÍDA LIBRE
+                transform.position += Vector3.down * 6.0f * Time.deltaTime;
+            }
+            else
+            {
+                // ATERRIZAJE SUAVE (Snap)
+                // Si estamos muy cerca del suelo pero flotando (ej: 0.1f), nos pegamos
+                float distanceToGround = hit.distance - 0.5f; // Restamos la altura del origen
+                if (distanceToGround > 0.05f)
+                {
+                    transform.position += Vector3.down * 2.0f * Time.deltaTime;
+                }
+            }
+        }
 
         public void MoveTo(Vector3 targetPosition)
         {
