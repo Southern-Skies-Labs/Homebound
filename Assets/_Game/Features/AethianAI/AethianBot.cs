@@ -2,10 +2,13 @@ using Homebound.Features.AethianAI.States;
 using UnityEngine;
 using Homebound.Features.TaskSystem;
 using System;
+using System.Collections;
 using Homebound.Features.TimeSystem;
 using Homebound.Core;
 using Homebound.Features.Identity;
 using Homebound.Features.Navigation;
+using Homebound.Features.Navigation.FailSafe;
+using Homebound.Features.VoxelWorld;
 
 namespace Homebound.Features.AethianAI
 {
@@ -30,6 +33,13 @@ namespace Homebound.Features.AethianAI
         private UnitMovementController _mover; // Nuestro nuevo chofer
         
         public UnitClass Class => Stats.Class;
+        public float _workTimer;
+        
+        //Variables FailSafe
+        private StuckMonitor _stuckMonitor;
+        private IFailSafeStrategy _failSafeStrategy;
+        private FailSafeBuilder _builder;
+        private PathfindingService _pathfinder;
         
         //Estado actual
         private AethianState _currentState;
@@ -45,11 +55,20 @@ namespace Homebound.Features.AethianAI
         
         protected virtual void Awake()
         {
+            _stuckMonitor = GetComponent<StuckMonitor>();
+            _failSafeStrategy = GetComponent<IFailSafeStrategy>();
+
+            if (_stuckMonitor != null)
+                _stuckMonitor.OnStuckDetected += HandleStuckSituation;
 
             _mover = GetComponent<UnitMovementController>();
+            _builder = ServiceLocator.Get<FailSafeBuilder>();
+            
+            if (_builder == null) _builder = FindFirstObjectByType<FailSafeBuilder>();
             
 
             if (_mover == null) Debug.LogError("¡Falta el UnitMovementController en el Prefab!");
+            
 
             StateIdle = new StateIdle(this);
             StateWorking = new StateWorking(this);
@@ -61,36 +80,36 @@ namespace Homebound.Features.AethianAI
         
         protected virtual System.Collections.IEnumerator Start()
         {
-            // FASE 1: ATERRIZAJE SEGURO 
-            bool sueloEncontrado = false;
-            int intentos = 0;
-
-            while (!sueloEncontrado && intentos < 20)
-            {
-                // Lanzamos un rayo desde un poco arriba de la unidad hacia abajo
-                Ray ray = new Ray(transform.position + Vector3.up * 2f, Vector3.down);
-                RaycastHit hit;
-
-                // Buscamos colisión con cualquier cosa sólida (VoxelWorld)
-                if (Physics.Raycast(ray, out hit, 1000f))
-                {
-                    // "Teletransportamos" la unidad justo al punto de impacto
-                    transform.position = hit.point;
-                    sueloEncontrado = true;
-                    Debug.Log($"[AethianBot] Aterrizaje físico exitoso en {hit.point}.");
-                }
-                else
-                {
-                    yield return new WaitForSeconds(0.1f);
-                    intentos++;
-                }
-            }
-
-            if (!sueloEncontrado)
-            {
-                Debug.LogError($"[AethianBot] CRÍTICO: La unidad {name} está flotando en el vacío (No hay suelo debajo).");
-                
-            }
+            // // FASE 1: ATERRIZAJE SEGURO 
+            // bool sueloEncontrado = false;
+            // int intentos = 0;
+            //
+            // while (!sueloEncontrado && intentos < 20)
+            // {
+            //     // Lanzamos un rayo desde un poco arriba de la unidad hacia abajo
+            //     Ray ray = new Ray(transform.position + Vector3.up * 2f, Vector3.down);
+            //     RaycastHit hit;
+            //
+            //     // Buscamos colisión con cualquier cosa sólida (VoxelWorld)
+            //     if (Physics.Raycast(ray, out hit, 1000f))
+            //     {
+            //         // "Teletransportamos" la unidad justo al punto de impacto
+            //         transform.position = hit.point;
+            //         sueloEncontrado = true;
+            //         Debug.Log($"[AethianBot] Aterrizaje físico exitoso en {hit.point}.");
+            //     }
+            //     else
+            //     {
+            //         yield return new WaitForSeconds(0.1f);
+            //         intentos++;
+            //     }
+            // }
+            //
+            // if (!sueloEncontrado)
+            // {
+            //     Debug.LogError($"[AethianBot] CRÍTICO: La unidad {name} está flotando en el vacío (No hay suelo debajo).");
+            //     
+            // }
 
             // FASE 2: CONEXIÓN AL TIEMPO
             int timeRetries = 0;
@@ -118,10 +137,9 @@ namespace Homebound.Features.AethianAI
         
         protected virtual void Update()
         {
-            
             if (_currentState != null) _currentStateName = _currentState.GetType().Name;
 
-            // 1. Metabolismo
+            // 1. Metabolismo (Sin cambios)
             if (_timeManager != null)
             {
                 float currentHour = _timeManager.CurrentTime.Hour;
@@ -134,23 +152,149 @@ namespace Homebound.Features.AethianAI
                     _lastHourCheck = currentHour;
                 }
             }
+              
+            // --- LÓGICA DE MINERÍA CORREGIDA ---
+            if (CurrentJob != null && CurrentJob.JobType == JobType.Mine)
+            {
+                // Usamos una distancia un poco más holgada para evitar que choque con el collider del bloque
+                if (Vector3.Distance(transform.position, CurrentJob.Position) < 2.0f) 
+                {
+                    // [CRÍTICO] ¡Frenar los motores!
+                    // Si no hacemos esto, el StuckMonitor pensará que estamos atascados contra la piedra.
+                    StopMoving(); 
+
+                    _workTimer += Time.deltaTime;
+                    
+                    // Feedback visual opcional: Rotar hacia la piedra
+                    Vector3 dir = (CurrentJob.Position - transform.position).normalized;
+                    dir.y = 0;
+                    if (dir != Vector3.zero) transform.rotation = Quaternion.LookRotation(dir);
+
+                    if (_workTimer >= 2.0f) 
+                    {
+                        // Efectuar Minería
+                        Vector3 checkPos = CurrentJob.Position + new Vector3(0.5f, 0.5f, 0.5f);
+                        Collider[] hits = Physics.OverlapSphere(checkPos, 0.8f, LayerMask.GetMask("Terrain"));               
+                        
+                        if (hits != null && hits.Length > 0)
+                        {
+                            // Priorizamos el objeto que tenga el componente Chunk
+                            Chunk targetChunk = null;
+                            foreach (var hit in hits)
+                            {
+                                targetChunk = hit.GetComponent<Chunk>();
+                                if (targetChunk != null) break;
+                            }
+
+                            if (targetChunk != null)
+                            {
+                                Debug.Log($"[AethianBot] Rompiendo bloque en {CurrentJob.Position} del Chunk {targetChunk.name}");
+                                targetChunk.DestroyBlockAtWorldPos(CurrentJob.Position);
+                                // UnitInventory.Add(StoneData, 1); 
+                            }
+                            else
+                            {
+                                Debug.LogError($"[AethianBot] ERROR: Detecté colisión en {CurrentJob.Position} pero el objeto no tiene script 'Chunk'. Objeto: {hits[0].name}");
+                            }
+                        }
+                        else
+                        {
+                            Debug.LogError($"[AethianBot] ERROR: No encontré ningún 'Terrain' en la posición {CurrentJob.Position}. ¿Radio muy pequeño o Layer incorrecta?");
+                        }
+            
+                        CompleteJob();
+                    }
+                }
+                else
+                {
+                    // [OPTIMIZACIÓN] Solo ordenamos mover si NO nos estamos moviendo ya
+                    // Esto evita recalcular el pathfinding 60 veces por segundo.
+                    // Asumimos que _mover es tu UnitMovementController.
+                    if (!HasReachedDestination()) 
+                    {
+                         // Si ya estamos caminando hacia allá, no spameamos la orden.
+                         // Nota: Si el UnitMovementController no expone 'TargetPosition', simplemente llamamos MoveTo
+                         // pero idealmente deberíamos chequear si ya tenemos ese destino.
+                         
+                         // Para tu código actual, una forma simple de evitar spam es chequear IsMoving:
+                         if (!_mover.IsMoving)
+                         {
+                             MoveTo(CurrentJob.Position);
+                         }
+                    }
+                }
+            }
+            // ---------------------------------
             
             if (CurrentJob != null && CurrentJob.IsCancelled)
             {
                 Debug.Log($"[Aethian] {name}: Mi tarea '{CurrentJob.JobName}' fue cancelada. Parando.");
-                StopMoving(); // Frenamos el motor
-                CurrentJob = null; // Olvidamos la tarea
-                ChangeState(StateIdle); // Volvemos a buscar trabajo
-                return; // Saltamos el resto del frame
+                StopMoving(); 
+                CurrentJob = null; 
+                ChangeState(StateIdle); 
+                return; 
             }
             
-            // 2. Transiciones
             CheckGlobalTransitions();
-
-            // 3. Ejecutar Estado
             _currentState?.Tick();
         }
         
+        private void HandleStuckSituation()
+        {
+            Debug.LogWarning($"[AethianBot] {name} ATASCADO. Iniciando protocolo Fail-Safe...");
+            
+            StopMoving(); // Detener intento actual
+
+            // 1. ¿A dónde queríamos ir?
+            // Si tenemos un Job, el destino es el Job. Si no, quizás el Banner.
+            Vector3 targetParams = (CurrentJob != null) ? CurrentJob.Position : transform.position; 
+            // Nota: Si estamos Idle y atascados, targetParams = self es inútil. 
+            // Asumiremos que si está atascado es porque quería ir a algún lado.
+            
+            // Si no hay destino claro, usamos el SafePosition de la estrategia
+            if (Vector3.Distance(transform.position, targetParams) < 1f)
+            {
+                targetParams = _failSafeStrategy.GetSafePosition();
+            }
+
+            StartCoroutine(ExecuteEscapeRoutine(targetParams));
+        }
+        
+        private IEnumerator ExecuteEscapeRoutine(Vector3 target)
+        {
+            if (_pathfinder == null) _pathfinder = ServiceLocator.Get<PathfindingService>();
+
+            // 2. Calcular Ruta de Emergencia (Simulación)
+            Debug.Log("[AethianBot] Calculando ruta de emergencia...");
+            var emergencyPath = _pathfinder.FindEmergencyPath(transform.position, target);
+
+            if (emergencyPath != null && emergencyPath.Count > 0)
+            {
+                Debug.Log($"[AethianBot] Solución encontrada: Construir puente de {emergencyPath.Count} bloques.");
+                
+                // 3. CONSTRUIR (Esperamos a que termine)
+                yield return StartCoroutine(_builder.BuildEmergencyRouteRoutine(emergencyPath));
+
+                // 4. MOVERSE (Ahora el camino es válido para el pathfinding normal)
+                MoveTo(target);
+            }
+            else
+            {
+                // 5. ULTIMO RECURSO: TELEPORT
+                Debug.LogError("[AethianBot] ¡Imposible construir ruta! Ejecutando TELEPORT de emergencia.");
+                Vector3 safePos = _failSafeStrategy.GetSafePosition();
+                
+                // Efecto visual (Opcional)
+                // Instantiate(TeleportVFX, transform.position...);
+                
+                transform.position = safePos;
+                yield return null; // Esperar un frame físico
+                
+                // Resetear cerebro
+                CurrentJob = null;
+                ChangeState(StateIdle);
+            }
+        }
         
         public void MoveTo(Vector3 position)
         {
@@ -264,21 +408,27 @@ namespace Homebound.Features.AethianAI
                             ChangeState(StateWorking);
                         }
                     }
+                  
                 }
             }
             // Caso B: Toca OCIO (Leisure)
             else if (scheduledActivity == ActivityType.Leisure)
             {
-                // ... (Misma lógica de antes: soltar trabajo y ponerse en Idle) ...
+                // CASO 1: Estoy trabajando -> Parar inmediatamente (Tu código actual)
                 if (_currentState is StateWorking)
                 {
-                    if (CurrentJob != null)
-                    {
-                        var jobManager = ServiceLocator.Get<JobManager>();
-                        jobManager?.ReturnJob(CurrentJob);
-                        CurrentJob = null;
-                    }
+                    Debug.Log($"[Aethian] {name}: Hora de descanso. Dejando trabajo.");
+                    ReturnCurrentJob(); // Helper para no repetir código
                     ChangeState(StateIdle);
+                }
+        
+                // CASO 2 (NUEVO): Estoy en IDLE pero tengo un trabajo "pegado" (ej: al despertar)
+                // Si no lo soltamos, el bot intentará ir a trabajar, creando el bucle.
+                else if (CurrentJob != null)
+                {
+                    Debug.Log($"[Aethian] {name}: Tengo tarea pendiente pero es hora de Ocio. La devuelvo.");
+                    ReturnCurrentJob();
+                    // Ya estamos en Idle o similar, no hace falta cambiar estado, pero aseguramos limpieza.
                 }
             }
         }
@@ -325,5 +475,36 @@ namespace Homebound.Features.AethianAI
                 Debug.Log($"[AethianBot] Ha nacido/llegado: {Stats.CharacterName}");
             }
         }
+        private void CompleteJob() 
+        {
+            if (CurrentJob != null)
+            {
+                var jobManager = ServiceLocator.Get<JobManager>();
+                // Asumimos que JobManager tiene un método para cerrar el trabajo.
+                // Si JobManager solo crea y no rastrea finalización, basta con esto:
+                
+                // Opción A: Notificar al Manager (Recomendado si JobManager lo soporta)
+                // jobManager.CompleteJob(CurrentJob); 
+                
+                // Opción B (Directa): Limpiar referencia local
+                Debug.Log($"[AethianBot] Trabajo '{CurrentJob.JobName}' completado.");
+                CurrentJob = null;
+            }
+
+            _workTimer = 0f;
+            ChangeState(StateIdle); // Volver a Idle para buscar nueva tarea o descansar
+        }
+        
+        private void ReturnCurrentJob()
+        {
+            if (CurrentJob != null)
+            {
+                var jobManager = ServiceLocator.Get<JobManager>();
+                jobManager?.ReturnJob(CurrentJob); 
+                CurrentJob = null;
+                StopMoving(); // Freno de seguridad
+            }
+        }
+        
     }
 }

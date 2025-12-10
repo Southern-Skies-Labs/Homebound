@@ -13,6 +13,11 @@ GameObject:
   - component: {fileID: 132296009371854640}
   - component: {fileID: -4212531190173567245}
   - component: {fileID: 8238417413627897938}
+  - component: {fileID: -6130806857890670916}
+  - component: {fileID: 6669737739315261795}
+  - component: {fileID: 6767062252594898895}
+  - component: {fileID: 5832696766177414448}
+  - component: {fileID: 465321051924159061}
   m_Layer: 8
   m_Name: Unit_Aethian_Base
   m_TagString: Untagged
@@ -85,7 +90,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _moveSpeed: 4
   _rotationSpeed: 10
-  _emergencyLadderPrefab: {fileID: 7157428569874335621, guid: b5d63164a85327e4c8ceb3aff4b6434f, type: 3}
+  _collisionCheckDist: 0.6
 --- !u!114 &8238417413627897938
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -105,6 +110,7 @@ MonoBehaviour:
     Health: 100
     MaxHealth: 100
     MetabolismRate: 1
+    GatheringPower: 1
     Hunger:
       Name: Hambre
       Value: 100
@@ -125,6 +131,101 @@ MonoBehaviour:
       CriticalThreshold: 20
   _currentStateName: 
   Schedule: {fileID: 11400000, guid: 0afbcb14833dc6d4ea52bc37b40ab2f4, type: 2}
+--- !u!114 &-6130806857890670916
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675548140487814534}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 933e49deba40609409c617361ee96dcc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _checkInterval: 1.5
+  _minProgressThreshold: 0.2
+  _maxStuckStrikes: 3
+--- !u!114 &6669737739315261795
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675548140487814534}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c241f92773d26de46b610ed45d3c94e2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!136 &6767062252594898895
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675548140487814534}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.5
+  m_Height: 1
+  m_Direction: 1
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!54 &5832696766177414448
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675548140487814534}
+  serializedVersion: 4
+  m_Mass: 1
+  m_Drag: 0
+  m_AngularDrag: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!114 &465321051924159061
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675548140487814534}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1f08fffb5eae09449a27e6e3891a9fa5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _raycastOriginHeight: 50
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 65
+  _autoRemoveAfterLanding: 1
+  _hasLanded: 0
 --- !u!1 &6058328310388587398
 GameObject:
   m_ObjectHideFlags: 0

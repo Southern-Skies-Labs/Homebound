@@ -18,7 +18,8 @@ namespace Homebound.Features.TaskSystem
         Build,
         Haul,
         Craft,
-        Chop
+        Chop,
+        Mine
     }
 
     [System.Serializable]
@@ -28,7 +29,7 @@ namespace Homebound.Features.TaskSystem
         public JobType JobType;
         public UnitClass RequiredClass;
         public Vector3 Position;
-        public Transform Target; // <--- SE LLAMA "Target", NO "TargetObject"
+        public Transform Target; 
         public int Priority;
 
         public IJobWorker Owner { get; private set; } 
@@ -65,8 +66,7 @@ namespace Homebound.Features.TaskSystem
         {
             IsCancelled = true;
         }
-
-        // --- FIX ERROR 5: Método Complete ---
+        
         public void Complete()
         {
             IsCompleted = true;

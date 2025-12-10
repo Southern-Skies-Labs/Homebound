@@ -17,7 +17,9 @@ MonoBehaviour:
   Description: "Recurso b\xE1sico de producci\xF3n y construcci\xF3n. Se obtiene
     de diferentes tipos de \xE1rboles."
   Icon: {fileID: 10913, guid: 0000000000000000f000000000000000, type: 0}
-  WorldPrefab: {fileID: 0}
+  WorldPrefab: {fileID: 1504533636408304201, guid: f57ca30e00339ce4eae5fba41063c4e1, type: 3}
   Type: 0
   MaxStack: 99
+  IsStackeable: 1
   NutritionValue: 0
+  SaturationValue: 1

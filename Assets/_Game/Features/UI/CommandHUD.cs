@@ -34,6 +34,15 @@ namespace Homebound.Features.UI
             Debug.Log($"[CommandHUD] Modo seleccionado: {jobType}");
             _interactionController.SetCommandMode(jobType);
         }
+        
+        public void OnMineClicked()
+        {
+            if (_interactionController != null)
+            {
+                _interactionController.SetCommandMode(JobType.Mine);
+                Debug.Log("[UI] Modo Minería activado. Selecciona un bloque.");
+            }
+        }
 
         private void OnDestroy()
         {

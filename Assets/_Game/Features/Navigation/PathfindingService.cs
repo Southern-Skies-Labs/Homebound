@@ -15,19 +15,24 @@ namespace Homebound.Features.Navigation
 
         public List<Vector3> FindPath(Vector3 startPos, Vector3 targetPos)
         {
+            return FindPathInternal(startPos, targetPos, false);
+        }
+        
+        public List<Vector3> FindEmergencyPath(Vector3 startPos, Vector3 targetPos)
+        {
+            Debug.Log("[Pathfinding] Intentando cálculo de ruta de EMERGENCIA (Con escaleras virtuales)...");
+            return FindPathInternal(startPos, targetPos, true);
+        }
+
+        private List<Vector3> FindPathInternal(Vector3 startPos, Vector3 targetPos, bool isEmergency)
+        {
             if (_gridManager == null) return null;
 
-            // 1. Obtener Nodos Base
             PathNode startNode = GetValidNodeNear(startPos);
-            PathNode targetNode = GetValidNodeNear(targetPos);
+            PathNode targetNode = GetValidNodeNear(targetPos); 
 
-            if (startNode == null || targetNode == null) 
-            {
-                Debug.LogWarning($"[Pathfinding] No se encontró nodo válido cerca de Inicio {startPos} o Fin {targetPos}");
-                return null;
-            }
+            if (startNode == null || targetNode == null) return null;
 
-            // 2. Algoritmo A* (Estándar)
             List<PathNode> openSet = new List<PathNode> { startNode };
             HashSet<PathNode> closedSet = new HashSet<PathNode>();
 
@@ -51,12 +56,18 @@ namespace Homebound.Features.Navigation
                 closedSet.Add(currentNode);
 
                 if (currentNode == targetNode) return RetracePath(startNode, targetNode);
-
-                foreach (PathNode neighbor in _gridManager.GetNeighbors(currentNode))
+                
+                foreach (PathNode neighbor in _gridManager.GetNeighbors(currentNode, isEmergency))
                 {
                     if (closedSet.Contains(neighbor)) continue;
+                    
+                    float penalty = neighbor.MovementPenalty;
+                    if (isEmergency && !neighbor.IsWalkableSurface) 
+                    {
+                        penalty += 100f; 
+                    }
 
-                    float moveCost = currentNode.GCost + (GetDistance(currentNode, neighbor) * neighbor.MovementPenalty);
+                    float moveCost = currentNode.GCost + (GetDistance(currentNode, neighbor) * penalty);
                     
                     if (moveCost < neighbor.GCost || !openSet.Contains(neighbor))
                     {

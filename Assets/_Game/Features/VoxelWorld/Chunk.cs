@@ -64,7 +64,10 @@ namespace Homebound.Features.VoxelWorld
 
                     // Altura del terreno base
                     int terrainHeight = Mathf.FloorToInt(Mathf.PerlinNoise(worldX * _noiseScale, worldZ * _noiseScale) * _heightMultiplier) + 5;
-
+                    // float noiseVal = Mathf.PerlinNoise(worldX * _noiseScale, worldZ * _noiseScale);
+                    // noiseVal = Mathf.Pow(noiseVal, 1.5f); // <--- Juega con este 2.0f (prueba 1.5f a 3.0f)
+                    // int terrainHeight = Mathf.FloorToInt(noiseVal * _heightMultiplier) + 5;
+                    
                     for (int y = 0; y < _height; y++)
                     {
                         if (y == 0) 
@@ -223,8 +226,7 @@ namespace Homebound.Features.VoxelWorld
                             case BlockType.Bedrock:
                                 nodeType = NodeType.Solid; // Impasable
                                 break;
-
-                            // Todos los bloques sólidos caminables
+                            
                             default: nodeType = NodeType.Solid; break;
                         }
 
@@ -238,6 +240,69 @@ namespace Homebound.Features.VoxelWorld
             }
 
             Debug.Log($"[Chunk] Terreno registrado en el Grid ({_width}x{_height}x{_width}).");
+        }
+        
+        public void ModifyVoxel(int x, int y, int z, BlockType newType)
+        {
+            // 4. Verificación de Límites EXPLÍCITA
+            if (x < 0 || x >= _width || y < 0 || y >= _height || z < 0 || z >= _width) // Nota: Usas _width para profundidad también
+            {
+                Debug.LogError($"[Chunk] ❌ ERROR DE LÍMITES: Intento modificar [{x},{y},{z}] pero el mapa es de {_width}x{_height}x{_width}.");
+                return;
+            }
+
+            // 5. Verificación de Estado Actual
+            if (_blocks[x, y, z] == newType)
+            {
+                Debug.LogWarning($"[Chunk] ⚠️ Aviso: El bloque en [{x},{y},{z}] ya es de tipo {newType}. No hubo cambios.");
+                return;
+            }
+
+            Debug.Log($"[Chunk] ✅ ÉXITO: Cambiando bloque [{x},{y},{z}] de {_blocks[x,y,z]} a {newType}. Regenerando malla...");
+
+            _blocks[x, y, z] = newType;
+            
+            // Regeneración
+            CreateMeshData(); 
+            
+            // Actualización lógica
+            UpdateGridLogic(x, y, z, newType);
+        }
+
+        private void UpdateGridLogic(int x, int y, int z, BlockType type)
+        {
+            var grid = ServiceLocator.Get<GridManager>();
+            if (grid == null) return;
+
+            int worldX = (int)transform.position.x + (x - _xOffset);
+            int worldZ = (int)transform.position.z + (z - _zOffset);
+            int worldY = (int)transform.position.y + y;
+
+            NodeType nodeType = (type == BlockType.Air) ? NodeType.Air : NodeType.Solid;
+            
+            grid.SetNode(worldX, worldY, worldZ, nodeType);
+        }
+        
+        public void DestroyBlockAtWorldPos(Vector3 worldPos)
+        {
+            // 1. Log de entrada
+            // Debug.Log($"[Chunk] Intento de destruir en WorldPos: {worldPos}");
+
+            // 2. Conversión de coordenadas (La matemática sospechosa)
+            // Recordamos: float worldX = transform.position.x + (x - _xOffset);
+            // Por tanto: x = (worldX - transform.position.x) + _xOffset;
+            
+            // Usamos FloorToInt o RoundToInt dependiendo de cómo generaste la malla. 
+            // Tu generación usa enteros directos, así que RoundToInt es lo correcto para el centro del bloque.
+            
+            int arrayX = Mathf.RoundToInt(worldPos.x - transform.position.x) + _xOffset;
+            int arrayZ = Mathf.RoundToInt(worldPos.z - transform.position.z) + _zOffset;
+            int arrayY = Mathf.RoundToInt(worldPos.y - transform.position.y);
+
+            Debug.Log($"[Chunk] Conversión: World {worldPos} -> Local Array [{arrayX}, {arrayY}, {arrayZ}] (Offset: {_xOffset}, {_zOffset})");
+
+            // 3. Llamada segura
+            ModifyVoxel(arrayX, arrayY, arrayZ, BlockType.Air);
         }
         
         

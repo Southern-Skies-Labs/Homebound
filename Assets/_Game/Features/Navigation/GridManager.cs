@@ -77,29 +77,51 @@ namespace Homebound.Features.Navigation
         }
 
         // --- LÓGICA DE VECINOS ---
+        
         public List<PathNode> GetNeighbors(PathNode node)
+        {
+            return GetNeighbors(node, false);
+        }
+        
+        public List<PathNode> GetNeighbors(PathNode node, bool useEmergencyRules)
         {
             List<PathNode> neighbors = new List<PathNode>();
             int[] xDir = { 0, 1, 0, -1 };
             int[] zDir = { 1, 0, -1, 0 };
 
-            // Convertimos a índices internos para buscar
             Vector3Int centerIdx = WorldToArray(node.X, node.Y, node.Z);
 
             for (int i = 0; i < 4; i++)
             {
                 int nx = centerIdx.x + xDir[i];
                 int nz = centerIdx.z + zDir[i];
-
-                // Revisamos niveles: -1 (Bajar), 0 (Plano), +1 (Subir)
+                
                 for (int yOffset = -1; yOffset <= 1; yOffset++)
                 {
                     int ny = centerIdx.y + yOffset;
                     
                     PathNode neighbor = GetNodeByIndex(nx, ny, nz);
                     
-                    // Si el vecino es una superficie válida (Aire con suelo abajo)
-                    if (neighbor != null && neighbor.IsWalkableSurface)
+                    if (neighbor == null) continue;
+                    
+                    bool isStandardWalkable = neighbor.IsWalkableSurface;
+                    
+                    bool isEmergencyWalkable = false;
+                    
+                    if (useEmergencyRules && !isStandardWalkable)
+                    {
+                        if (neighbor.Type == NodeType.Air)
+                        {
+                            PathNode above = GetNodeByIndex(nx, ny + 1, nz);
+                            
+                            if (above == null || above.Type == NodeType.Air)
+                            {
+                                isEmergencyWalkable = true;
+                            }
+                        }
+                    }
+
+                    if (isStandardWalkable || isEmergencyWalkable)
                     {
                         neighbors.Add(neighbor);
                     }
