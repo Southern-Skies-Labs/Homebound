@@ -18,6 +18,10 @@ GameObject:
   - component: {fileID: 6767062252594898895}
   - component: {fileID: 5832696766177414448}
   - component: {fileID: 465321051924159061}
+  - component: {fileID: 2849399761151150207}
+  - component: {fileID: -1472188314086583455}
+  - component: {fileID: 6087073609362779579}
+  - component: {fileID: 8370115818216144234}
   m_Layer: 8
   m_Name: Unit_Aethian_Base
   m_TagString: Untagged
@@ -106,32 +110,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8f82a03ce69c0a342892c6518bb0fab6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Stats:
-    CharacterName: Aldeano
-    Title: Errante
-    Class: 0
-    Health: 100
-    MaxHealth: 100
-    MetabolismRate: 1
-    GatheringPower: 1
-    Hunger:
-      Name: Hambre
-      Value: 100
-      MaxValue: 100
-      DecayRate: 5
-      CriticalThreshold: 20
-    Thirst:
-      Name: Sed
-      Value: 100
-      MaxValue: 100
-      DecayRate: 5
-      CriticalThreshold: 20
-    Energy:
-      Name: "Energ\xEDa"
-      Value: 100
-      MaxValue: 100
-      DecayRate: 3
-      CriticalThreshold: 20
+  Stats: {fileID: 0}
   _currentStateName: 
   Schedule: {fileID: 11400000, guid: 0afbcb14833dc6d4ea52bc37b40ab2f4, type: 2}
   _workTimer: 0
@@ -230,6 +209,81 @@ MonoBehaviour:
     m_Bits: 65
   _autoRemoveAfterLanding: 1
   _hasLanded: 0
+--- !u!114 &2849399761151150207
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675548140487814534}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0b635f75bebf4c428f68b7a8673d958, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &-1472188314086583455
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675548140487814534}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2517bfc9558cf6540868060ca811f7bb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  CharacterName: Aldeano
+  Title: Errante
+  Class: 0
+  Health: 100
+  MaxHealth: 100
+  MetabolismRate: 1
+  GatheringPower: 1
+  Hunger:
+    Name: Hambre
+    Value: 100
+    MaxValue: 100
+    DecayRate: 10
+    CriticalThreshold: 20
+  Thirst:
+    Name: Sed
+    Value: 100
+    MaxValue: 100
+    DecayRate: 15
+    CriticalThreshold: 20
+  Energy:
+    Name: "Energ\xEDa"
+    Value: 100
+    MaxValue: 100
+    DecayRate: 5
+    CriticalThreshold: 20
+--- !u!114 &6087073609362779579
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675548140487814534}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 54cda1d9c1a66264b9e5b3b22953e220, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &8370115818216144234
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675548140487814534}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca95b9d68ba44204ea28c579b8c0d28a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _hungerPanicLevel: 0
+  _energyCriticalLevel: 5
 --- !u!1 &6058328310388587398
 GameObject:
   m_ObjectHideFlags: 0
