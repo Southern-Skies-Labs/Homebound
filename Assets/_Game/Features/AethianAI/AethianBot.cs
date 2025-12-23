@@ -30,18 +30,17 @@ namespace Homebound.Features.AethianAI
         
         private TimeManager _timeManager;
         private Dictionary<JobType, IJobStrategy> _jobStrategies;
-        
+
 
         public Vector3 Position => transform.position;
 
-        private UnitMovementController _mover; 
-        
-        public UnitClass Class => Stats.Class;
+        private UnitMovementController _mover;
+
+        public UnitClassDefinition Class => Stats.CurrentClass;
         public float _workTimer;
 
         //Variables FailSafe
         private StuckMonitor _stuckMonitor;
-        //private PathfindingService _pathfinder;
         private AethianSafetySystem _safetySystem;
 
         //Estado actual
@@ -80,23 +79,46 @@ namespace Homebound.Features.AethianAI
             if (Stats == null) Stats = gameObject.AddComponent<AethianStats>();
 
             _stuckMonitor = GetComponent<StuckMonitor>();
-
             if (_stuckMonitor != null)
                 _stuckMonitor.OnStuckDetected += HandleStuckSituation;
 
-            _mover = GetComponent<UnitMovementController>();
-           
-            if (_mover == null) Debug.LogError("¡Falta el UnitMovementController en el Prefab!");
-            
 
+            _mover = GetComponent<UnitMovementController>();           
+            if (_mover == null) Debug.LogError("¡Falta el UnitMovementController en el Prefab!");
+
+            // Inicialización de estados
             StateIdle = new StateIdle(this);
             StateWorking = new StateWorking(this);
             StateSurvival = new StateSurvival(this);
             StateSleep = new StateSleep(this);
             StateGather = new StateGather(this);
             StateBuilding = new StateBuilding(this);
+
+            InitializeStrategies();
         }
-        
+
+        private void InitializeStrategies()
+        {
+            _jobStrategies = new Dictionary<JobType, IJobStrategy>();
+
+            if (Stats.CurrentClass != null && Stats.CurrentClass.SupportedJobs != null)
+            {
+                foreach (var jobType in Stats.CurrentClass.SupportedJobs)
+                {
+                    IJobStrategy strategy = JobStrategyFactory.CreateStrategy(jobType);
+                    if (strategy != null)
+                    {
+                        _jobStrategies.Add(jobType, strategy);
+                    }
+                }
+                Debug.Log($"[AethianBot] {name} cargó {_jobStrategies.Count} estrategias de clase {Stats.CurrentClass.ClassName}.");
+            }
+            else
+            {
+                Debug.LogWarning($"[AethianBot] {name} no tiene clase asignada en Stats o la clase no tiene trabajos definidos.");
+            }
+        }
+
         protected virtual System.Collections.IEnumerator Start()
         {
              // CONEXIÓN AL TIEMPO
@@ -122,7 +144,7 @@ namespace Homebound.Features.AethianAI
 
             if (CurrentJob != null)
             {
-                if (JobStrategies.TryGetValue(CurrentJob.JobType, out var strategy))
+                if (_jobStrategies.TryGetValue(CurrentJob.JobType, out var strategy))
                 {
                     strategy.Execute(this, Time.deltaTime);
                 }
@@ -197,11 +219,8 @@ namespace Homebound.Features.AethianAI
         
         public bool IsAvailable()
         {
-            // Solo disponible si estoy en estado Working (o Idle queriendo trabajar)
-            // Y NO estoy agotado
             if (Stats.Energy.Value <= 10f) return false;
             
-            // Y si es horario laboral (opcional, pero StateWorking ya filtra esto)
             return true; 
         }
         
@@ -236,35 +255,6 @@ namespace Homebound.Features.AethianAI
 
             _workTimer = 0f;
             ChangeState(StateIdle); // Volver a Idle para buscar nueva tarea o descansar
-        }
-        
-        private void ReturnCurrentJob()
-        {
-            if (CurrentJob != null)
-            {
-                var jobManager = ServiceLocator.Get<JobManager>();
-                jobManager?.ReturnJob(CurrentJob); 
-                CurrentJob = null;
-                StopMoving(); // Freno de seguridad
-            }
-        }
-
-        private Dictionary<JobType, IJobStrategy> JobStrategies
-        {
-            get
-            {
-                if (_jobStrategies == null)
-                {
-                    _jobStrategies = new Dictionary<JobType, IJobStrategy>
-                    {
-                        // Aca registro las estrategias de trabajo disponibles
-                        { JobType.Mine, new MiningJobStrategy() }
-                        // Futuro: { JobType.Build, new BuildingJobStrategy() }
-                    };
-                    Debug.Log($"[AethianBot] Estrategias de trabajo inicializadas (Lazy Init) para {name}");
-                }
-                return _jobStrategies;
-            }
         }
 
     }

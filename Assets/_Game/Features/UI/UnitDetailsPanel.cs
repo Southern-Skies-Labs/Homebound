@@ -98,11 +98,13 @@ namespace Homebound.Features.UI
         
         private void UpdateStateText()
         {
-            if (_stateText != null)
+            if (_stateText != null && _selectedBot != null)
             {
-                _stateText.text = _selectedBot.Stats.ToString();
+                string className = _selectedBot.Stats.CurrentClass != null ?
+                                   _selectedBot.Stats.CurrentClass.ClassName : "Sin Clase";
+                _stateText.text = className;
             }
-            
+
         }
         
     }

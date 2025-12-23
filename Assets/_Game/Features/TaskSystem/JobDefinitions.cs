@@ -2,14 +2,6 @@ using UnityEngine;
 
 namespace Homebound.Features.TaskSystem
 {
-    public enum UnitClass
-    {
-        Villager,
-        Builder,
-        Miner,
-        Guard
-    }
-
     public enum JobType
     {
         Idle,
@@ -27,18 +19,20 @@ namespace Homebound.Features.TaskSystem
     {
         public string JobName;
         public JobType JobType;
-        public UnitClass RequiredClass;
+
+        public UnitClassDefinition RequiredClass;
+
         public Vector3 Position;
-        public Transform Target; 
+        public Transform Target;
         public int Priority;
 
-        public IJobWorker Owner { get; private set; } 
-        
+        public IJobWorker Owner { get; private set; }
+
         public bool IsClaimed => Owner != null;
         public bool IsCancelled { get; private set; }
-        public bool IsCompleted { get; private set; } // <--- NUEVO
+        public bool IsCompleted { get; private set; }
 
-        public JobRequest(string name, JobType type, Vector3 pos, Transform target, int priority, UnitClass requiredClass = UnitClass.Villager)
+        public JobRequest(string name, JobType type, Vector3 pos, Transform target, int priority, UnitClassDefinition requiredClass)
         {
             JobName = name;
             JobType = type;
@@ -46,7 +40,7 @@ namespace Homebound.Features.TaskSystem
             Target = target;
             Priority = priority;
             RequiredClass = requiredClass;
-            
+
             IsCancelled = false;
             IsCompleted = false;
             Owner = null;
@@ -66,10 +60,11 @@ namespace Homebound.Features.TaskSystem
         {
             IsCancelled = true;
         }
-        
+
         public void Complete()
         {
             IsCompleted = true;
         }
+
     }
 }

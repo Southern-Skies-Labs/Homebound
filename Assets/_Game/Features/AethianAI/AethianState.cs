@@ -11,13 +11,10 @@ namespace Homebound.Features.AethianAI
             _bot = bot;
         }
         
-        //Se ejecuta al entrar al estado
         public virtual void Enter(){}
 
-        //Se ejecuta cada frame
         public abstract void Tick();
         
-        //Se ejecuta al salir del estado
         public virtual void Exit(){}
 
     }

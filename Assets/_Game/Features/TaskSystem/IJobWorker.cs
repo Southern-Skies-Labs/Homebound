@@ -5,6 +5,6 @@ namespace Homebound.Features.TaskSystem
     public interface IJobWorker
     {
         Vector3 Position { get; }
-        UnitClass Class { get; }
+        UnitClassDefinition Class { get; }
     }
 }

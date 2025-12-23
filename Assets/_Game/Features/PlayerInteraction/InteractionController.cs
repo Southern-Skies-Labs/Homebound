@@ -31,6 +31,10 @@ namespace Homebound.Features.PlayerInteraction
         [SerializeField] private LayerMask _resourceLayer;
         [SerializeField] private LayerMask _unitLayer;
 
+        [Header("Requisitos de Trabajo")]
+        [Tooltip("Arrastra aquí el asset 'Villager_Data'")]
+        [SerializeField] private UnitClassDefinition _requiredWorkerClass;
+
         [Header("Tools")] 
         [SerializeField] private bool _isMiningMode = false;
 
@@ -247,8 +251,8 @@ namespace Homebound.Features.PlayerInteraction
                     _pendingJobType, 
                     targetPos, 
                     targetTransform, 
-                    50, 
-                    UnitClass.Villager
+                    50,
+                    _requiredWorkerClass
                 );
                 
                 _jobManager.PostJob(job);
@@ -372,8 +376,8 @@ namespace Homebound.Features.PlayerInteraction
                 JobType.Mine,                      
                 new Vector3(pos.x, pos.y, pos.z),  
                 null,                              
-                50,                                
-                UnitClass.Villager                 
+                50,
+                _requiredWorkerClass
             );
 
             jobManager.PostJob(miningJob);

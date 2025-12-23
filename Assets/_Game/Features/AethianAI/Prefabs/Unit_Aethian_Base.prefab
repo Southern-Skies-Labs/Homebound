@@ -235,7 +235,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   CharacterName: Aldeano
   Title: Errante
-  Class: 0
+  _currentClassDef: {fileID: 11400000, guid: 93585c9562246b341b0b2000aab5491b, type: 2}
   Health: 100
   MaxHealth: 100
   MetabolismRate: 1

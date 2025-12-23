@@ -1250,6 +1250,7 @@ MonoBehaviour:
   _unitLayer:
     serializedVersion: 2
     m_Bits: 256
+  _requiredWorkerClass: {fileID: 0}
   _isMiningMode: 0
 --- !u!4 &413795753
 Transform:
@@ -5476,6 +5477,10 @@ PrefabInstance:
     - target: {fileID: -4212531190173567245, guid: 059b8de46ce023f48a2d53dd4716836d, type: 3}
       propertyPath: _emergencyLadderPrefab
       value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: -1472188314086583455, guid: 059b8de46ce023f48a2d53dd4716836d, type: 3}
+      propertyPath: GatheringPower
+      value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 465321051924159061, guid: 059b8de46ce023f48a2d53dd4716836d, type: 3}
       propertyPath: _hasLanded

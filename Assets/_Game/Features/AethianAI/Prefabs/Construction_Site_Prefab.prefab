@@ -103,6 +103,7 @@ MonoBehaviour:
   _blueprint: {fileID: 0}
   _maxWorkers: 4
   _completionParticles: {fileID: 0}
+  _requiredWorkerClass: {fileID: 11400000, guid: 93585c9562246b341b0b2000aab5491b, type: 2}
   _blockCosts:
   - Block: 2
     Item: {fileID: 11400000, guid: a7540fe3ceb74fb4da1762b2f41d636d, type: 2}

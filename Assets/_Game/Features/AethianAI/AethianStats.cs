@@ -9,7 +9,11 @@ namespace Homebound.Features.AethianAI
         [Header("Identity")]
         public string CharacterName = "Aldeano";
         public string Title = "Errante";
-        public UnitClass Class = UnitClass.Villager;
+
+        [Header("Class Configuration")]
+        [Tooltip("Arrastra aquí el asset UnitClassDefinition (ej. Villager_Data)")]
+        [SerializeField] private UnitClassDefinition _currentClassDef;
+        public UnitClassDefinition CurrentClass => _currentClassDef;
 
         [Header("Vitality")]
         public float Health = 100f;
@@ -34,6 +38,14 @@ namespace Homebound.Features.AethianAI
             Hunger.Decay(deltaGameHours * MetabolismRate);
             Thirst.Decay(deltaGameHours * MetabolismRate);
             Energy.Decay(deltaGameHours);
+        }
+
+        private void OnValidate()
+        {
+            if (_currentClassDef == null)
+            {
+                Debug.LogWarning($"[AethianStats] {_currentClassDef} no está asignado en {gameObject.name}. Por favor, asigna un UnitClassDefinition válido.");
+            }
         }
     }
 }

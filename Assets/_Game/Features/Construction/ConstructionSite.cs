@@ -25,7 +25,10 @@ namespace Homebound.Features.Construction
         [SerializeField] private int _maxWorkers = 4;
         [SerializeField] private ParticleSystem _completionParticles;
 
-        
+        [Header("Requisitos de Trabajo")]
+        [Tooltip("Arrastra aquí el asset 'Villager_Data'")]
+        [SerializeField] private UnitClassDefinition _requiredWorkerClass;
+
         [Header("Costes de Materiales")]
         [SerializeField] private List<BlockCostMapping> _blockCosts;
 
@@ -168,13 +171,19 @@ namespace Homebound.Features.Construction
         {
             if (_jobManager == null) return;
 
+            if (_requiredWorkerClass == null)
+            {
+                Debug.LogError($"[ConstructionSite] ¡Falta asignar la '_requiredWorkerClass' en el inspector de {name}!");
+                return;
+            }
+
             JobRequest newJob = new JobRequest(
                 "Construir " + _blueprint.name,
                 JobType.Build,
                 transform.position,
                 this.transform,
                 1,
-                UnitClass.Villager 
+                _requiredWorkerClass
             );
             
 
@@ -279,13 +288,15 @@ namespace Homebound.Features.Construction
         {
             if(_jobManager == null) return;
 
+            if (_requiredWorkerClass == null) return;
+
             JobRequest scaffoldJob = new JobRequest(
                 "Construir Andamio",
                 JobType.Build,
                 transform.position,
                 this.transform,
                 1,
-                UnitClass.Villager
+                _requiredWorkerClass
                 );
             _activeJobs.Add(scaffoldJob);
             _jobManager.PostJob(scaffoldJob);
