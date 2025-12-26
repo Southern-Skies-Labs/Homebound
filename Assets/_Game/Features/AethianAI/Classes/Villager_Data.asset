@@ -13,9 +13,10 @@ MonoBehaviour:
   m_Name: Villager_Data
   m_EditorClassIdentifier: 
   ClassName: Aldeano
-  Description: 
+  Description: "Realiza tareas de: Terraformaci\xF3n, construcci\xF3n, recolecci\xF3n,
+    miner\xEDa b\xE1sica, talar y almacenar."
   Icon: {fileID: 0}
   BaseHealth: 100
   BaseMetabolism: 1
-  BaseGatheringPower: 1
-  SupportedJobs: 06000000070000000400000002000000
+  BaseGatheringPower: 5
+  SupportedJobs: 0600000007000000040000000200000003000000

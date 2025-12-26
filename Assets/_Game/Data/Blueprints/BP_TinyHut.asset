@@ -13,13 +13,16 @@ MonoBehaviour:
   m_Name: BP_TinyHut
   m_EditorClassIdentifier: 
   BuildingName: Choza de Prueba
+  Description: 
+  Icon: {fileID: 0}
   StructureBlocks:
   - LocalPosition: {x: 0, y: 0, z: 0}
-    Type: 2
+    Type: 7
   - LocalPosition: {x: 1, y: 0, z: 0}
-    Type: 2
+    Type: 7
   - LocalPosition: {x: 0, y: 1, z: 0}
-    Type: 2
-  DetailBlocks:
-  - LocalPosition: {x: 1, y: 1, z: 0}
-    Type: 2
+    Type: 7
+  Props: []
+  ConstructionCosts:
+  - Resource: {fileID: 11400000, guid: f1bdd609aa6c5d746a2eb991c2e715fc, type: 2}
+    Amount: 10

@@ -83,7 +83,7 @@ namespace Homebound.Features.Construction
 
            
             var structureList = blueprint.StructureBlocks ?? new List<BlueprintBlock>();
-            var detailsList = blueprint.DetailBlocks ?? new List<BlueprintBlock>();
+            var detailsList = blueprint.StructureBlocks ?? new List<BlueprintBlock>();
 
             
             var sortedStructure = structureList
