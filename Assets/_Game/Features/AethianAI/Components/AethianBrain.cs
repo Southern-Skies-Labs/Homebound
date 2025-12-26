@@ -16,7 +16,7 @@ namespace Homebound.Features.AethianAI.Components
         // Configuración de umbrales 
         [Header("Decision Thresholds")]
         [SerializeField] private float _hungerPanicLevel = 0f; 
-        [SerializeField] private float _energyCriticalLevel = 5f;
+        //[SerializeField] private float _energyCriticalLevel = 5f;
 
         private void Awake()
         {

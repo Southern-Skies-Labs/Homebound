@@ -35,7 +35,7 @@ namespace Homebound.Features.Economy
         public bool DepositItem(ItemData item, int amount)
         {
             
-            if (!_acceptsAllItems) return false; // Aquí podrías añadir lógica de filtro por tipo
+            if (!_acceptsAllItems) return false; 
 
             
             int leftOver = _internalInventory.Add(item, amount);
@@ -54,6 +54,32 @@ namespace Homebound.Features.Economy
 
             return false;
         }
+
+        public bool TryRetrieveItem(ItemData item, int requestedAmount, out int retrievedAmount)
+        {
+            retrievedAmount = 0;
+
+            int currentCount = _internalInventory.Count(item);
+            if (currentCount == 0) return false;
+
+            int amountToTake = Mathf.Min(requestedAmount, currentCount);
+
+            if (_internalInventory.Remove(item, amountToTake))
+            {
+                retrievedAmount = amountToTake;
+
+                var cityInv = ServiceLocator.Get<CityInventory>();
+                if (cityInv != null)
+                {
+                    cityInv.Remove(item, amountToTake);
+                }
+                return true;
+            }
+            return false;
+            
+        }
+
+
 
         public bool CanAccept(ItemData item)
         {

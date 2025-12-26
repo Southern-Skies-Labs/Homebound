@@ -12,6 +12,9 @@ namespace Homebound.Features.AethianAI.Strategies
                 case JobType.Mine:
                     return new MiningJobStrategy();
 
+                case JobType.Build:
+                    return new BuildJobStrategy();
+
                 default:
                     return null;
             }

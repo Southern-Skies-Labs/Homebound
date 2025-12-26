@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Homebound.Core;
+using NUnit.Framework.Interfaces;
+using UnityEditor.SceneManagement;
 
 namespace Homebound.Features.Navigation
 {
@@ -8,7 +10,7 @@ namespace Homebound.Features.Navigation
     {
         private PathNode[,,] _grid;
         private int _width, _height, _depth;
-        private Vector3Int _gridOriginOffset; // Offset para centrar coordenadas
+        private Vector3Int _gridOriginOffset; 
 
         private void Awake() => ServiceLocator.Register(this);
         private void OnDestroy() => ServiceLocator.Unregister<GridManager>();
@@ -35,10 +37,31 @@ namespace Homebound.Features.Navigation
             Debug.Log($"[GridManager] Grilla 2.0 inicializada: {width}x{height}x{depth}");
         }
 
-        // Convierte Coordenada Mundo -> Índice Array
         public Vector3Int WorldToArray(int x, int y, int z)
         {
             return new Vector3Int(x - _gridOriginOffset.x, y - _gridOriginOffset.y, z - _gridOriginOffset.z);
+        }
+        // --- API DE RESERVAS ---
+        public bool TryReserve(Vector3Int worldPos, object owner)
+        {
+            PathNode node = GetNode(worldPos.x, worldPos.y, worldPos.z);
+
+            if (node == null) return false;
+            if (node.Type == NodeType.Solid) return false;
+
+            if (node.IsReserved() && node.ReservedBy != owner) return false;
+
+            node.Reserve(owner);
+            return true;
+        }
+
+        public void ClearReservation(Vector3Int worldPos, object owner)
+        {
+            PathNode node = GetNode(worldPos.x, worldPos.y, worldPos.z);
+            if (node != null && node.ReservedBy == owner)
+            {
+                node.ClearReservation();
+            }
         }
 
         // --- API DE ACTUALIZACIÓN ---

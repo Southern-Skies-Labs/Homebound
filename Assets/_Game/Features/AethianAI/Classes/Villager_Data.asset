@@ -18,5 +18,5 @@ MonoBehaviour:
   Icon: {fileID: 0}
   BaseHealth: 100
   BaseMetabolism: 1
-  BaseGatheringPower: 5
+  BaseGatheringPower: 10
   SupportedJobs: 0600000007000000040000000200000003000000

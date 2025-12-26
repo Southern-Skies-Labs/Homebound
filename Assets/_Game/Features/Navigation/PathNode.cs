@@ -24,6 +24,9 @@ namespace Homebound.Features.Navigation
         // 1.0f = Normal, 0.5f = Rápido (Road)
         public float MovementPenalty; 
 
+        //Sistema de Reservas
+        public object ReservedBy { get; private set; }
+
         // Variables A*
         public float GCost;
         public float HCost;
@@ -37,6 +40,11 @@ namespace Homebound.Features.Navigation
             Type = NodeType.Air;
             IsWalkableSurface = false;
             MovementPenalty = 1.0f;
+            ReservedBy = null;
         }
+
+        public void Reserve(object owner) => ReservedBy = owner;
+        public void ClearReservation() => ReservedBy = null;
+        public bool IsReserved() => ReservedBy != null;
     }
 }
