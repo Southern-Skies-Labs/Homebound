@@ -21,6 +21,7 @@
   <Project Path="Homebound.Core.csproj" />
   <Project Path="Homebound.Features.Economy.csproj" />
   <Project Path="Unity.Multiplayer.Center.Common.csproj" />
+  <Project Path="Homebound.Features.Visuals.csproj" />
   <Project Path="Homebound.Features.AethianAI.csproj" />
   <Project Path="Unity.ShaderGraph.Utilities.csproj" />
   <Project Path="Homebound.Features.Navigation.csproj" />
