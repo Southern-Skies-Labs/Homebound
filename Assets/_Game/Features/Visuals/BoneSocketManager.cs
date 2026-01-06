@@ -27,22 +27,24 @@ namespace Homebound.Features.Visuals
 
         public GameObject Mount(GameObject prefab, SocketType socketType)
         {
-            ClearSocket(socketType); // Limpia lo anterior
+            ClearSocket(socketType);
 
             if (prefab == null) return null;
 
             Transform targetBone = GetBone(socketType);
-            if (targetBone == null) return null;
+            if (targetBone == null)
+            {
+                Debug.LogError($"[BoneSocketManager] No se encontró hueso para {socketType}");
+                return null;
+            }
 
+            // Instanciamos
             GameObject instance = Instantiate(prefab, targetBone);
 
-            // Reset transforms
-            instance.transform.localPosition = Vector3.zero;
-            instance.transform.localRotation = Quaternion.identity;
-            instance.transform.localScale = Vector3.one;
+            // IMPORTANTE: NO tocamos transform.localPosition ni localScale aquí.
+            // Dejamos que el objeto nazca "sucio" y el UnitAppearanceController lo limpiará.
 
             _currentAttachments[socketType] = instance;
-
             return instance;
         }
 

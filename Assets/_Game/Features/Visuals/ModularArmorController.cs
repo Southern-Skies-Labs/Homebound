@@ -6,34 +6,42 @@ namespace Homebound.Features.Visuals
     public class ModularArmorController : MonoBehaviour
     {
         [Header("Configuración")]
-        [Tooltip("El hueso raíz del esqueleto PRINCIPAL del personaje (generalmente Hips o la raíz de la armadura)")]
+        [Tooltip("Si lo dejas vacío, el script intentará encontrar 'Armature/Hips' o 'Hips' automáticamente.")]
         [SerializeField] private Transform _mainRootBone;
 
-        // Cache para buscar huesos rápidamente por nombre (ej: "Forearm_L" -> Transform real)
+        [Header("Debug")]
+        [SerializeField] private GameObject _debugArmorToEquip;
+
+        // Cache de huesos del cuerpo base
         private Dictionary<string, Transform> _boneMap = new Dictionary<string, Transform>();
-
-        // Rastreo de la armadura actual para poder quitársela antes de poner otra
         private GameObject _currentArmorInstance;
-
-        //Variable Temporal
-        public GameObject DebugArmorPrefab;
 
         private void Awake()
         {
+            // --- AUTO-CORRECCIÓN DE REFERENCIA ---
             if (_mainRootBone == null)
             {
-                // Intento automático de encontrar el root si es un setup estándar
-                Animator anim = GetComponent<Animator>();
-                if (anim != null) _mainRootBone = anim.transform; // Fallback, idealmente asignar manual
-            }
+                // Intentamos encontrar el hueso raíz por nombre común
+                _mainRootBone = transform.Find("Armature/Hips"); // Estructura Blender típica
 
-            // Mapeamos TODOS los huesos del personaje original al iniciar
+                if (_mainRootBone == null)
+                    _mainRootBone = transform.Find("Hips"); // Estructura directa
+
+                if (_mainRootBone == null)
+                    _mainRootBone = transform.Find("Armature"); // Solo Armature
+
+                if (_mainRootBone == null)
+                {
+                    Debug.LogError($"[ModularArmorController] ¡CRÍTICO! No encuentro el hueso raíz en {name}. Asígnalo manual o revisa nombres.");
+                    return; // Abortar para evitar errores peores
+                }
+            }
+            // -------------------------------------
+
+            // Mapear el esqueleto base al iniciar
             MapBones(_mainRootBone);
         }
 
-        /// <summary>
-        /// Recorre recursivamente el esqueleto y guarda referencias por nombre.
-        /// </summary>
         private void MapBones(Transform current)
         {
             if (!_boneMap.ContainsKey(current.name))
@@ -47,62 +55,72 @@ namespace Homebound.Features.Visuals
             }
         }
 
-        /// <summary>
-        /// Equipa una pieza de armadura usando la técnica de Reskinning.
-        /// </summary>
-        /// <param name="armorPrefab">Prefab que contiene SOLO el SkinnedMeshRenderer de la ropa</param>
         public void EquipArmor(GameObject armorPrefab)
         {
             // 1. Limpieza
             if (_currentArmorInstance != null) Destroy(_currentArmorInstance);
             if (armorPrefab == null) return;
 
-            // 2. Instanciar la ropa (desactivada para que no parpadee al ajustar)
-            _currentArmorInstance = Instantiate(armorPrefab, transform);
-            _currentArmorInstance.SetActive(false);
+            // 2. Instanciación SEGURA
+            _currentArmorInstance = Instantiate(armorPrefab, null);
+            _currentArmorInstance.transform.SetParent(transform);
 
-            // 3. Obtener el Renderer de la ropa
-            var armorRenderer = _currentArmorInstance.GetComponentInChildren<SkinnedMeshRenderer>();
-            if (armorRenderer == null)
+            // 3. Resetear Transformaciones
+            _currentArmorInstance.transform.localPosition = Vector3.zero;
+            _currentArmorInstance.transform.localRotation = Quaternion.identity;
+            _currentArmorInstance.transform.localScale = Vector3.one;
+
+            // 4. Reskinning
+            var renderers = _currentArmorInstance.GetComponentsInChildren<SkinnedMeshRenderer>();
+
+            if (renderers.Length == 0) Debug.LogWarning($"[ModularArmorController] {armorPrefab.name} no tiene Renderer.");
+
+            foreach (var renderer in renderers)
             {
-                Debug.LogError($"[ModularArmorController] El prefab {armorPrefab.name} no tiene SkinnedMeshRenderer.");
-                return;
-            }
+                Transform[] newBones = new Transform[renderer.bones.Length];
 
-            // 4. EL TRUCO DE MAGIA (Reskinning)
-            // Creamos un nuevo array de huesos que coincida con lo que la ropa espera,
-            // pero apuntando a los huesos REALES de este personaje.
-            Transform[] newBones = new Transform[armorRenderer.bones.Length];
-
-            for (int i = 0; i < armorRenderer.bones.Length; i++)
-            {
-                string boneName = armorRenderer.bones[i].name;
-
-                if (_boneMap.TryGetValue(boneName, out Transform realBone))
+                for (int i = 0; i < renderer.bones.Length; i++)
                 {
-                    newBones[i] = realBone;
+                    Transform bone = renderer.bones[i];
+
+                    // Verificación extra: si el hueso es null en la lista original
+                    if (bone != null && _boneMap.TryGetValue(bone.name, out Transform realBone))
+                    {
+                        newBones[i] = realBone;
+                    }
+                    else
+                    {
+                        newBones[i] = _mainRootBone;
+                    }
+                }
+
+                renderer.bones = newBones;
+
+                // --- CORRECCIÓN DEL ERROR ---
+                // Verificamos si rootBone existe antes de pedir su nombre.
+                if (renderer.rootBone != null && _boneMap.ContainsKey(renderer.rootBone.name))
+                {
+                    renderer.rootBone = _boneMap[renderer.rootBone.name];
                 }
                 else
                 {
-                    Debug.LogWarning($"[ModularArmorController] La ropa busca el hueso '{boneName}' pero el personaje no lo tiene.");
-                    // Fallback: Asignar al root para evitar errores críticos, aunque se verá raro
-                    newBones[i] = _mainRootBone;
+                    // Si venía en 'None' o no encontramos el nombre, asignamos el principal.
+                    renderer.rootBone = _mainRootBone;
                 }
             }
-
-            // 5. Asignar los nuevos huesos y encender
-            armorRenderer.bones = newBones;
-            armorRenderer.rootBone = _boneMap.ContainsKey(armorRenderer.rootBone.name) ? _boneMap[armorRenderer.rootBone.name] : _mainRootBone;
-
-            _currentArmorInstance.SetActive(true);
-            Debug.Log($"[ModularArmorController] Armadura {armorPrefab.name} equipada y sincronizada.");
         }
 
-        // Método de prueba para usar desde el Inspector (Menú contextual)
-        [ContextMenu("Test Equip Armor (Assign Prefab First)")]
-        public void TestEquip()
+        [ContextMenu("Debug Equip Armor")]
+        public void DebugEquip()
         {
-            EquipArmor(DebugArmorPrefab);
+            if (_debugArmorToEquip != null)
+            {
+                EquipArmor(_debugArmorToEquip);
+            }
+            else
+            {
+                Debug.LogWarning("Asigna una ropa en 'Debug Armor To Equip' antes de probar.");
+            }
         }
     }
 }

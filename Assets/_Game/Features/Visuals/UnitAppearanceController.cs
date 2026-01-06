@@ -9,8 +9,8 @@ namespace Homebound.Features.Visuals
         [SerializeField] private StyleDatabase _database;
 
         [Header("Target Renderers")]
-        [Tooltip("Arrastra aquí los OBJETOS (GameObjects) de las partes del cuerpo (Cabeza, Torso, etc.). El script buscará sus renderers automáticamente.")]
-        [SerializeField] private GameObject[] _bodyPartObjects; // <--- CAMBIO: Ahora es GameObject (Acepta todo)
+        [Tooltip("Arrastra aquí los GameObjects de las partes del cuerpo (Cabeza, Torso, etc)")]
+        [SerializeField] private GameObject[] _bodyPartObjects;
 
         private BoneSocketManager _sockets;
 
@@ -21,9 +21,6 @@ namespace Homebound.Features.Visuals
 
         private void Start()
         {
-            // Opcional: Validar al inicio si falta algún renderer
-            ValidateRenderers();
-
             RandomizeAppearance();
         }
 
@@ -32,67 +29,69 @@ namespace Homebound.Features.Visuals
         {
             if (_database == null) return;
 
-            // 1. Aplicar Piel
+            // 1. Piel (Igual que antes)
             Material randomSkin = _database.GetRandomSkin();
+            ApplyMaterialToParts(_bodyPartObjects, randomSkin);
 
-            if (randomSkin != null && _bodyPartObjects != null)
+            // 2. Ojos (CON AJUSTE MANUAL)
+            var eyeSettings = _database.GetRandomEyeSettings(); // Obtenemos la config, no solo el prefab
+            if (eyeSettings != null && eyeSettings.prefab != null)
             {
-                foreach (var obj in _bodyPartObjects)
-                {
-                    if (obj == null) continue;
+                // Montamos el objeto
+                GameObject instance = _sockets.Mount(eyeSettings.prefab, SocketType.FaceEyes);
 
-                    // Buscamos el Renderer (Skinned o Mesh) en el objeto
-                    Renderer r = obj.GetComponent<Renderer>();
-                    if (r != null)
-                    {
-                        r.sharedMaterial = randomSkin;
-                    }
-                    else
-                    {
-                        // Intento de seguridad: buscar en hijos si arrastraste un padre vacío
-                        r = obj.GetComponentInChildren<Renderer>();
-                        if (r != null) r.sharedMaterial = randomSkin;
-                    }
+                // --- APLICAMOS LA CORRECCIÓN FORZADA ---
+                if (instance != null)
+                {
+                    instance.transform.localPosition = eyeSettings.positionOffset;
+                    instance.transform.localEulerAngles = eyeSettings.rotationOffset;
+                    instance.transform.localScale = eyeSettings.scaleOverride;
+
+                    ApplyMaterialTo(instance, _database.GetRandomEyeColor());
                 }
             }
 
-            // 2. Colocar y Colorear Ojos
-            GameObject eyePrefab = _database.GetRandomEyes();
-            if (eyePrefab != null)
+            // 3. Pelo (CON AJUSTE MANUAL)
+            var hairSettings = _database.GetRandomHairSettings();
+            if (hairSettings != null && hairSettings.prefab != null)
             {
-                GameObject eyeInstance = _sockets.Mount(eyePrefab, SocketType.FaceEyes);
-                ApplyMaterialTo(eyeInstance, _database.GetRandomEyeColor());
-            }
+                GameObject instance = _sockets.Mount(hairSettings.prefab, SocketType.HeadTop);
 
-            // 3. Colocar y Colorear Cabello
-            GameObject hairPrefab = _database.GetRandomHair();
-            if (hairPrefab != null)
-            {
-                GameObject hairInstance = _sockets.Mount(hairPrefab, SocketType.HeadTop);
-                ApplyMaterialTo(hairInstance, _database.GetRandomHairColor());
+                // --- APLICAMOS LA CORRECCIÓN FORZADA ---
+                if (instance != null)
+                {
+                    instance.transform.localPosition = hairSettings.positionOffset;
+                    instance.transform.localEulerAngles = hairSettings.rotationOffset;
+                    instance.transform.localScale = hairSettings.scaleOverride;
+
+                    ApplyMaterialTo(instance, _database.GetRandomHairColor());
+                }
             }
         }
 
-        private void ApplyMaterialTo(GameObject obj, Material mat)
+        private void ApplyMaterialToParts(GameObject[] objects, Material mat)
         {
-            if (obj == null || mat == null) return;
+            if (objects == null || mat == null) return;
 
-            Renderer[] renderers = obj.GetComponentsInChildren<Renderer>();
+            foreach (var obj in objects)
+            {
+                if (obj == null) continue;
+                Renderer r = obj.GetComponent<Renderer>();
+                if (r == null) r = obj.GetComponentInChildren<Renderer>(); 
+
+                if (r != null) r.sharedMaterial = mat;
+            }
+        }
+
+        private void ApplyMaterialTo(GameObject rootInstance, Material mat)
+        {
+            if (rootInstance == null || mat == null) return;
+
+            // Aplicar a todos los renderers dentro del objeto (útil para prefabs compuestos)
+            Renderer[] renderers = rootInstance.GetComponentsInChildren<Renderer>();
             foreach (var r in renderers)
             {
                 r.sharedMaterial = mat;
-            }
-        }
-
-        private void ValidateRenderers()
-        {
-            if (_bodyPartObjects == null) return;
-            foreach (var obj in _bodyPartObjects)
-            {
-                if (obj != null && obj.GetComponent<Renderer>() == null)
-                {
-                    Debug.LogWarning($"[UnitAppearanceController] El objeto '{obj.name}' asignado en BodyParts NO tiene componente Renderer.");
-                }
             }
         }
     }

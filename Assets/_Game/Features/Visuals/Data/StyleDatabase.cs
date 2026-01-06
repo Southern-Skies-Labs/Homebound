@@ -3,26 +3,36 @@ using System.Collections.Generic;
 
 namespace Homebound.Features.Visuals
 {
+    // Clase auxiliar para guardar el prefab Y sus ajustes
+    [System.Serializable]
+    public class AccessorySettings
+    {
+        public string idName; // Para que lo identifiques en la lista
+        public GameObject prefab;
+
+        [Header("Ajustes Forzados")]
+        public Vector3 positionOffset = Vector3.zero; // ¿Cuánto bajarlo?
+        public Vector3 rotationOffset = Vector3.zero;
+        public Vector3 scaleOverride = new Vector3(0.1f, 0.1f, 0.1f); // Forzamos 0.1 por defecto
+    }
+
     [CreateAssetMenu(fileName = "StyleDatabase", menuName = "Homebound/Visuals/Style Database")]
     public class StyleDatabase : ScriptableObject
     {
-        [Header("Geometría (Modelos)")]
-        public List<GameObject> Hairstyles;
-        public List<GameObject> Eyes;
+        [Header("Accesorios con Ajustes")]
+        // Cambiamos List<GameObject> por List<AccessorySettings>
+        public List<AccessorySettings> Hairstyles;
+        public List<AccessorySettings> Eyes;
 
         [Header("Paletas (Materiales)")]
-        [Tooltip("Materiales con diferentes texturas de paleta para la piel")]
         public List<Material> SkinMaterials;
-
-        [Tooltip("Materiales para teñir el cabello")]
         public List<Material> HairMaterials;
-
-        [Tooltip("Materiales para el color de ojos")]
         public List<Material> EyeMaterials;
 
-        // Métodos de ayuda para randomización
-        public GameObject GetRandomHair() => GetRandom(Hairstyles);
-        public GameObject GetRandomEyes() => GetRandom(Eyes);
+        // Métodos actualizados para devolver la configuración completa
+        public AccessorySettings GetRandomHairSettings() => GetRandom(Hairstyles);
+        public AccessorySettings GetRandomEyeSettings() => GetRandom(Eyes);
+
         public Material GetRandomSkin() => GetRandom(SkinMaterials);
         public Material GetRandomHairColor() => GetRandom(HairMaterials);
         public Material GetRandomEyeColor() => GetRandom(EyeMaterials);

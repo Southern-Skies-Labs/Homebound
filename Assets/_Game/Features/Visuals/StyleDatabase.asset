@@ -13,9 +13,12 @@ MonoBehaviour:
   m_Name: StyleDatabase
   m_EditorClassIdentifier: 
   Hairstyles:
-  - {fileID: 4901230166896819467, guid: df9faf34797c62a4b933bc73c6867e41, type: 3}
+  - {fileID: 5898636827032896276, guid: 05548826eb6a5d94d8cae9aafd4f361a, type: 3}
   Eyes:
-  - {fileID: 1823856363604250153, guid: 1c4df5d07f4f71a48bd2557f814e6c1e, type: 3}
-  SkinMaterials: []
-  HairMaterials: []
-  EyeMaterials: []
+  - {fileID: 3007974895714656120, guid: df42b3f8416a62547ba1603e6c16744f, type: 3}
+  SkinMaterials:
+  - {fileID: 2100000, guid: 7bab792df1cc7254da001842c09cf2bf, type: 2}
+  HairMaterials:
+  - {fileID: 2100000, guid: 44db0ec042c7753499c479497ed2b77d, type: 2}
+  EyeMaterials:
+  - {fileID: 2100000, guid: 43be1c55645fa4e40beddbd0e6d19c9e, type: 2}
