@@ -3,6 +3,7 @@ using UnityEngine;
 namespace Homebound.Features.Visuals
 {
     [RequireComponent(typeof(BoneSocketManager))]
+    [RequireComponent(typeof(ModularArmorController))]
     public class UnitAppearanceController : MonoBehaviour
     {
         [Header("Base Data")]
@@ -13,10 +14,12 @@ namespace Homebound.Features.Visuals
         [SerializeField] private GameObject[] _bodyPartObjects;
 
         private BoneSocketManager _sockets;
+        private ModularArmorController _armorController;
 
         private void Awake()
         {
             _sockets = GetComponent<BoneSocketManager>();
+            _armorController = GetComponent<ModularArmorController>();
         }
 
         private void Start()
@@ -29,18 +32,16 @@ namespace Homebound.Features.Visuals
         {
             if (_database == null) return;
 
-            // 1. Piel (Igual que antes)
+            // 1. Piel 
             Material randomSkin = _database.GetRandomSkin();
             ApplyMaterialToParts(_bodyPartObjects, randomSkin);
 
-            // 2. Ojos (CON AJUSTE MANUAL)
-            var eyeSettings = _database.GetRandomEyeSettings(); // Obtenemos la config, no solo el prefab
+            // 2. Ojos 
+            var eyeSettings = _database.GetRandomEyeSettings(); 
             if (eyeSettings != null && eyeSettings.prefab != null)
             {
-                // Montamos el objeto
                 GameObject instance = _sockets.Mount(eyeSettings.prefab, SocketType.FaceEyes);
 
-                // --- APLICAMOS LA CORRECCIÓN FORZADA ---
                 if (instance != null)
                 {
                     instance.transform.localPosition = eyeSettings.positionOffset;
@@ -51,13 +52,12 @@ namespace Homebound.Features.Visuals
                 }
             }
 
-            // 3. Pelo (CON AJUSTE MANUAL)
+            // 3. Pelo 
             var hairSettings = _database.GetRandomHairSettings();
             if (hairSettings != null && hairSettings.prefab != null)
             {
                 GameObject instance = _sockets.Mount(hairSettings.prefab, SocketType.HeadTop);
 
-                // --- APLICAMOS LA CORRECCIÓN FORZADA ---
                 if (instance != null)
                 {
                     instance.transform.localPosition = hairSettings.positionOffset;
@@ -67,6 +67,16 @@ namespace Homebound.Features.Visuals
                     ApplyMaterialTo(instance, _database.GetRandomHairColor());
                 }
             }
+
+            // 4. Ropa
+            GameObject randomOutfit = _database.GetRandomOutfit();
+            if (randomOutfit != null && _armorController != null)
+            {
+                // AQUÍ ASUMO QUE TU ModularArmorController TIENE UN MÉTODO 'Equip'
+                // Si se llama diferente, cambia el nombre aquí abajo.
+                _armorController.EquipArmor(randomOutfit);
+            }
+
         }
 
         private void ApplyMaterialToParts(GameObject[] objects, Material mat)

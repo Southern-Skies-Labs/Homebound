@@ -23,6 +23,8 @@ namespace Homebound.Features.Visuals
         // Cambiamos List<GameObject> por List<AccessorySettings>
         public List<AccessorySettings> Hairstyles;
         public List<AccessorySettings> Eyes;
+        [Header("Ropa Inicial")]
+        public List<GameObject> DefaultOutfits; 
 
         [Header("Paletas (Materiales)")]
         public List<Material> SkinMaterials;
@@ -32,6 +34,8 @@ namespace Homebound.Features.Visuals
         // Métodos actualizados para devolver la configuración completa
         public AccessorySettings GetRandomHairSettings() => GetRandom(Hairstyles);
         public AccessorySettings GetRandomEyeSettings() => GetRandom(Eyes);
+
+        public GameObject GetRandomOutfit() => GetRandom(DefaultOutfits);
 
         public Material GetRandomSkin() => GetRandom(SkinMaterials);
         public Material GetRandomHairColor() => GetRandom(HairMaterials);

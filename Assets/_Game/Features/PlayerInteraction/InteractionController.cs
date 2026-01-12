@@ -23,7 +23,10 @@ namespace Homebound.Features.PlayerInteraction
         [Header("References")] 
         [SerializeField] private Camera _mainCamera;
         [SerializeField] private Transform _selectionGhost;
-        [SerializeField] private GameObject _aethianPrefab;
+
+        [Header("Debug Spawner")]
+        [SerializeField] private GameObject _malePrefab;   
+        [SerializeField] private GameObject _femalePrefab;
 
         [FormerlySerializedAs("_terrainLayer")]
         [Header("Layers")] 
@@ -268,9 +271,25 @@ namespace Homebound.Features.PlayerInteraction
 
         private void SpawnDebugUnit()
         {
-            if (!_isValidHover || _aethianPrefab == null) return;
-            Instantiate(_aethianPrefab, _currentGridPos, Quaternion.identity);
-            Debug.Log("[Interaction] Unidad de prueba spawneada.");
+            if (!_isValidHover) return;
+
+            // LÓGICA DE RANDOMIZACIÓN (50% / 50%)
+            // Random.value devuelve un número entre 0.0 y 1.0.
+            GameObject prefabToSpawn = (UnityEngine.Random.value > 0.5f) ? _malePrefab : _femalePrefab;
+
+            if (prefabToSpawn != null)
+            {
+                // Instanciamos el prefab elegido.
+                // NOTA: Al nacer, el 'Start()' del UnitAppearanceController dentro del prefab
+                // se ejecutará automáticamente, eligiendo ropa, pelo y ojos al azar.
+                Instantiate(prefabToSpawn, _currentGridPos, Quaternion.identity);
+
+                Debug.Log($"[Interaction] Unidad de prueba spawneada ({prefabToSpawn.name}).");
+            }
+            else
+            {
+                Debug.LogWarning("[Interaction] ¡Falta asignar los prefabs Male/Female en el Inspector!");
+            }
         }
 
         // --- UTILIDADES ---
