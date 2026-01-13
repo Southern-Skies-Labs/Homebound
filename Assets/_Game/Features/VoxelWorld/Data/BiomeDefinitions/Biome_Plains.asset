@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9fd76756f98896243b386d7b57c3b1a8, type: 3}
+  m_Name: Biome_Plains
+  m_EditorClassIdentifier: 
+  surfaceBlock: {fileID: 11400000, guid: 4dff7ca1f2ac6734a93b9626c6d89566, type: 2}
+  subSurfaceBlock: {fileID: 11400000, guid: ce7952d14f38fb74d84b22416f46a7e4, type: 2}
+  deepBlock: {fileID: 11400000, guid: 9409dcc6a61b8b74fb94809ca76d2ffe, type: 2}
+  liquidBlock: {fileID: 11400000, guid: 49a50816cb01ca24488aad0949cff648, type: 2}
+  ores:
+  - name: Coal
+    oreBlock: {fileID: 11400000, guid: 526d63a61b4083948a3f0e5f3d5be210, type: 2}
+    internalID: 0
+    rarity: 0.08
+    veinSize: 0.1
+    minDepth: 0
+    maxDepth: 10
+  - name: Copper
+    oreBlock: {fileID: 11400000, guid: 10d965cd65247fe48b2c21a3c448b33f, type: 2}
+    internalID: 0
+    rarity: 0.06
+    veinSize: 0.12
+    minDepth: 0
+    maxDepth: 15
+  - name: Gold
+    oreBlock: {fileID: 11400000, guid: 43326598ff803844eb87427d9f30b060, type: 2}
+    internalID: 0
+    rarity: 0.01
+    veinSize: 0.2
+    minDepth: 0
+    maxDepth: 20
+  terrainScale: 15
+  heightCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 1
+      outSlope: 1
+      tangentMode: 34
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 1
+      outSlope: 1
+      tangentMode: 34
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  treeProbability: 0.05
+  treePrefabs:
+  - {fileID: 8268794613189668189, guid: 01bbc4015903ed94c80e548e1522fb08, type: 3}

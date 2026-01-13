@@ -2,6 +2,7 @@
   <Project Path="Unity.RenderPipelines.GPUDriven.Runtime.csproj" />
   <Project Path="Unity.ShaderGraph.Editor.csproj" />
   <Project Path="Unity.RenderPipelines.Core.Runtime.csproj" />
+  <Project Path="Homebound.Core.csproj" />
   <Project Path="Unity.Multiplayer.Center.Editor.csproj" />
   <Project Path="Unity.RenderPipelines.Core.Editor.csproj" />
   <Project Path="UnityEngine.UI.csproj" />
@@ -19,7 +20,6 @@
   <Project Path="Homebound.Features.VoxelWorld.csproj" />
   <Project Path="UnityEditor.UI.csproj" />
   <Project Path="Assembly-CSharp-Editor.csproj" />
-  <Project Path="Homebound.Core.csproj" />
   <Project Path="Homebound.Features.Economy.csproj" />
   <Project Path="Unity.Multiplayer.Center.Common.csproj" />
   <Project Path="Homebound.Features.Visuals.csproj" />

@@ -1,127 +1,114 @@
 using UnityEngine;
+using System.Collections.Generic;
 using Homebound.Core;
-using Homebound.Features.Navigation;
 
 namespace Homebound.Features.VoxelWorld
 {
-    public class WorldGenerator : MonoBehaviour
+    public class WorldGenerator : MonoBehaviour, IWorldDataProvider
     {
-        [Header("Settings - Map")]
-        [SerializeField] private int _mapSize = 50;
-        [SerializeField] private int _mapHeight = 20;
-        [SerializeField] private Chunk _chunkPrefab;
+        [Header("World Settings")]
+        [SerializeField] private int _worldSeed = 12345;
+        [SerializeField] private int _worldSizeChunks = 8;
 
-        [Header("Settings - Vegetation")]
-        [SerializeField] private GameObject _treePrefab;
-        [SerializeField] private int _treeCount = 10;
-        [SerializeField] private int _seed = 12345; // Semilla para resultados consistentes
-        [SerializeField] private Transform _resourceContainer; // Carpeta para organizarlos
+        [Header("Generation Parameters")]
+        [SerializeField] private float _noiseScale = 50f;
+        [SerializeField] private int _baseHeight = 10;
 
-        private GridManager _gridManager;
+        [Header("Rendering & Biomes")]
+        [SerializeField] private Material _voxelMaterial; // <--- NUEVO CAMPO
+        [SerializeField] private BiomeDefinition _startingBiome;
+        [SerializeField] private BiomeDefinition _defaultBiome;
+
+        private Dictionary<Vector2Int, Chunk> _chunks = new Dictionary<Vector2Int, Chunk>();
+        private INoiseGenerator _noiseGenerator;
+
+        public static WorldGenerator Instance { get; private set; }
+
+        private void Awake()
+        {
+            Instance = this;
+            ServiceLocator.Register<IWorldDataProvider>(this);
+            InitializeWorld();
+        }
+
+        private void OnDestroy()
+        {
+            ServiceLocator.Unregister<IWorldDataProvider>();
+        }
 
         private void Start()
         {
-            // 1. Configurar Semilla (Determinismo)
-            Random.InitState(_seed);
-
-            // 2. Inicializar Sistemas
-            _gridManager = ServiceLocator.Get<GridManager>();
-            if (_gridManager == null)
-            {
-                Debug.LogError("[WorldGenerator] CRÍTICO: GridManager no encontrado.");
-                return;
-            }
-
-            InitializeNavigationGrid();
-            CreateChunk();
-            
-            // 3. Poblar el Mundo (NUEVO)
-            GenerateVegetation();
-        }
-        
-        private void InitializeNavigationGrid()
-        {
-            // Inicializamos la matriz lógica
-            _gridManager.InitializeGrid(_mapSize, _mapHeight, _mapSize);
+            GenerateWorld();
         }
 
-        private void CreateChunk()
+        private void InitializeWorld()
         {
-            Chunk chunk = GetComponentInChildren<Chunk>();
-            if (chunk == null)
-            {
-                chunk = Instantiate(_chunkPrefab, transform);
-            }
-            
-            // El Chunk genera la mesh y notifica al Grid qué es suelo y qué es aire
-            chunk.Initialize(_mapSize, _mapHeight, _mapSize);
+            _noiseGenerator = new FastNoiseGenerator(_worldSeed);
+
+            // Validación de seguridad
+            if (_voxelMaterial == null) Debug.LogError("CRITICAL: Voxel Material not assigned in WorldGenerator!");
+            if (_defaultBiome == null) Debug.LogError("CRITICAL: Default Biome not assigned!");
         }
 
-        private void GenerateVegetation()
+        public void GenerateWorld()
         {
-            if (_treePrefab == null) return;
+            ClearWorld();
 
-            int placedTrees = 0;
-            int attempts = 0;
-            int maxAttempts = _treeCount * 5; // Evitar bucles infinitos
+            int startRange = -(_worldSizeChunks / 2);
+            int endRange = (_worldSizeChunks / 2);
 
-            // Carpeta organizadora
-            if (_resourceContainer == null)
+            for (int x = startRange; x < endRange; x++)
             {
-                var containerObj = new GameObject("Resources_Container");
-                containerObj.transform.SetParent(this.transform);
-                _resourceContainer = containerObj.transform;
-            }
-
-            Debug.Log($"[WorldGenerator] Iniciando plantación de {_treeCount} árboles...");
-
-            while (placedTrees < _treeCount && attempts < maxAttempts)
-            {
-                attempts++;
-
-                // 1. Coordenada Aleatoria (Considerando el offset del mundo, ej: -25 a 25)
-                int halfSize = _mapSize / 2;
-                int x = Random.Range(-halfSize, halfSize);
-                int z = Random.Range(-halfSize, halfSize);
-
-                // 2. Buscar Suelo (Raycast Lógico Vertical)
-                // Empezamos desde arriba y bajamos hasta encontrar suelo
-                for (int y = _mapHeight - 2; y > 0; y--)
+                for (int z = startRange; z < endRange; z++)
                 {
-                    PathNode floorNode = _gridManager.GetNode(x, y, z);
-                    PathNode airNode = _gridManager.GetNode(x, y + 1, z);
-
-                    // Validamos: Abajo no es aire (es suelo), Arriba es aire (espacio libre)
-                    // Nota: floorNode.Type != NodeType.Air asume que el Chunk ya marcó el suelo como Solid
-                    if (floorNode != null && floorNode.Type != NodeType.Air && 
-                        airNode != null && airNode.Type == NodeType.Air)
-                    {
-                        // ¡Sitio válido encontrado!
-                        SpawnTree(x, y + 1, z); // Spawnear ENCIMA del suelo
-                        placedTrees++;
-                        break; // Salir del bucle Y, ir al siguiente árbol
-                    }
+                    CreateChunk(x, z);
                 }
             }
-            
-            Debug.Log($"[WorldGenerator] Vegetación generada: {placedTrees}/{_treeCount} árboles.");
         }
 
-        private void SpawnTree(int x, int y, int z)
+        private void CreateChunk(int x, int z)
         {
-            Vector3 position = new Vector3(x, y, z);
-            
-            // Instanciar
-            GameObject newTree = Instantiate(_treePrefab, position, Quaternion.identity, _resourceContainer);
-            
-            // Importante: Aleatorizar rotación (solo eje Y) para variedad visual
-            float randomYRot = Random.Range(0, 4) * 90f; // Rotaciones de 90 grados estilo voxel
-            newTree.transform.rotation = Quaternion.Euler(0, randomYRot, 0);
+            Vector2Int coord = new Vector2Int(x, z);
+            GameObject chunkObj = new GameObject($"Chunk_{x}_{z}");
+            chunkObj.transform.parent = transform;
+            chunkObj.transform.position = new Vector3(x * VoxelData.ChunkWidth, 0, z * VoxelData.ChunkWidth);
 
-            // ACTUALIZACIÓN DE NAVGRID:
-            // El tronco del árbol ocupa un espacio, los bots no deben caminar a través de él.
-            // Marcamos ese nodo como "Solid" (Obstáculo) en la lógica de navegación.
-            _gridManager.SetNode(x, y, z, NodeType.Solid);
+            Chunk newChunk = chunkObj.AddComponent<Chunk>();
+
+            BiomeDefinition biomeToUse = (x == 0 && z == 0) ? _startingBiome : _defaultBiome;
+
+            // Pasamos el material explícitamente
+            newChunk.Initialize(coord, _noiseGenerator, biomeToUse, _voxelMaterial, _noiseScale, _baseHeight);
+
+            _chunks.Add(coord, newChunk);
+        }
+
+        private void ClearWorld()
+        {
+            foreach (var chunk in _chunks.Values)
+            {
+                if (chunk != null && chunk.gameObject != null)
+                    Destroy(chunk.gameObject);
+            }
+            _chunks.Clear();
+        }
+
+        public int GetBlockIDAt(Vector3Int globalPos)
+        {
+            int chunkX = Mathf.FloorToInt((float)globalPos.x / VoxelData.ChunkWidth);
+            int chunkZ = Mathf.FloorToInt((float)globalPos.z / VoxelData.ChunkWidth);
+            Vector2Int coord = new Vector2Int(chunkX, chunkZ);
+
+            if (_chunks.TryGetValue(coord, out Chunk chunk))
+            {
+                int localX = globalPos.x - (chunkX * VoxelData.ChunkWidth);
+                int localY = globalPos.y;
+                int localZ = globalPos.z - (chunkZ * VoxelData.ChunkWidth);
+
+                return chunk.GetBlockAtLocalPos(localX, localY, localZ);
+            }
+
+            return -1;
         }
     }
 }

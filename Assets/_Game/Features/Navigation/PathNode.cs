@@ -7,7 +7,8 @@ namespace Homebound.Features.Navigation
         Air,            // Vacío
         Solid,          // Muro/Tierra (No se puede estar DENTRO)
         Road,           // Camino construido (Bonificador de velocidad)
-        Obstacle        // Bloqueo temporal (Muebles, Trampas)
+        Obstacle,        // Bloqueo temporal (Muebles, Trampas)
+        Water
     }
 
     public class PathNode

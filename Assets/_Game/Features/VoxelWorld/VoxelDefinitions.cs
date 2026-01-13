@@ -2,6 +2,8 @@ using UnityEngine;
 
 namespace Homebound.Features.VoxelWorld
 {
+    // Mantenemos el Enum solo para evitar errores de compilación masivos inmediatos.
+    // En la Fase 2, reemplazaremos su uso por strings o índices directos.
     public enum BlockType : byte
     {
         Air = 0,
@@ -15,66 +17,52 @@ namespace Homebound.Features.VoxelWorld
         Leaves = 8,
         Bedrock = 255
     }
-    
+
     public static class VoxelData
     {
-        // Vértices y Triángulos 
+        // Dimensiones del Chunk (Estándar de Homebound)
+        public static readonly int ChunkWidth = 16;
+        public static readonly int ChunkHeight = 128; // Ampliado para soportar montañas
+
+        // --- Geometría Estática (No cambia) ---
         public static readonly Vector3[] VoxelVerts = new Vector3[8]
         {
-            new Vector3(0.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f), 
-            new Vector3(1.0f, 1.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), 
-            new Vector3(0.0f, 0.0f, 1.0f), new Vector3(1.0f, 0.0f, 1.0f), 
-            new Vector3(1.0f, 1.0f, 1.0f), new Vector3(0.0f, 1.0f, 1.0f), 
+            new Vector3(0.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f),
+            new Vector3(1.0f, 1.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f),
+            new Vector3(0.0f, 0.0f, 1.0f), new Vector3(1.0f, 0.0f, 1.0f),
+            new Vector3(1.0f, 1.0f, 1.0f), new Vector3(0.0f, 1.0f, 1.0f),
         };
-        
+
         public static readonly int[,] VoxelTris = new int[6, 4]
         {
-            {0, 3, 1, 2}, {5, 6, 4, 7}, {3, 7, 2, 6}, 
-            {1, 5, 0, 4}, {4, 7, 0, 3}, {1, 2, 5, 6} 
+            {0, 3, 1, 2}, // Back Face
+            {5, 6, 4, 7}, // Front Face
+            {3, 7, 2, 6}, // Top Face
+            {1, 5, 0, 4}, // Bottom Face
+            {4, 7, 0, 3}, // Left Face
+            {1, 2, 5, 6}  // Right Face
         };
-        
+
         public static readonly Vector3Int[] FaceChecks = new Vector3Int[6]
         {
-            new Vector3Int(0, 0, -1), new Vector3Int(0, 0, 1), new Vector3Int(0, 1, 0),
-            new Vector3Int(0, -1, 0), new Vector3Int(-1, 0, 0), new Vector3Int(1, 0, 0)
+            new Vector3Int(0, 0, -1), // Back
+            new Vector3Int(0, 0, 1),  // Front
+            new Vector3Int(0, 1, 0),  // Top
+            new Vector3Int(0, -1, 0), // Bottom
+            new Vector3Int(-1, 0, 0), // Left
+            new Vector3Int(1, 0, 0)   // Right
         };
 
-        //SISTEMA DE TEXTURE ARRAY 
-        //Formato: { Indice_Inicio, Cantidad_Variantes }
+        // NOTA: La lógica de BlockTextureIndices ha sido eliminada.
+        // Ahora es responsabilidad de 'BlockDefinition.GetTextureIndex()'.
 
-        private static readonly int[][] BlockTextureIndices = new int[][]
-        {
-            new int[] { 0, 0 },   // 0: Air (No usa texturas)
-            new int[] { 0, 3 },   // 1: Grass (Índices 0, 1, 2) -> 3 variantes
-            new int[] { 3, 2 },   // 2: Dirt  (Índices 3, 4)    -> 2 variantes
-            new int[] { 5, 2 },   // 3: Stone (Índices 5, 6)    -> 2 variantes
-            new int[] { 7, 1 },   // 4: Coal  (Índice 7)        -> 1 variante
-            new int[] { 8, 2 },   // 5: Copper (Índices 8, 9)   -> 2 variantes
-            new int[] { 10, 2 },  // 6: Gold   (Índices 10, 11) -> 2 variantes (CORREGIDO, antes pisaba Copper)
-            // new int[] { 12, 2 },  // 7: Wood   (Índices 12, 13) -> 2 variantes (CORREGIDO)
-            // new int[] { 14, 2 },  // 8: Leaves (Índices 14, 15) -> 2 variantes (CORREGIDO)
-        };
-
+        // --- PARCHE TEMPORAL PARA COMPILACIÓN (Eliminar en Fase 2) ---
+        // Esto permite que el viejo Chunk.cs compile mientras creamos los nuevos datos.
         public static int GetTextureIndex(BlockType blockID, Vector3 position)
         {
-            // Mapeo seguro para Bedrock u otros
-            if (blockID == BlockType.Bedrock) return 5; // Usa piedra por defecto
-            int id = (int)blockID;
-            if (id >= BlockTextureIndices.Length) return 0;
-
-            int[] info = BlockTextureIndices[id];
-            int startIndex = info[0];
-            int variantCount = info[1];
-
-            if (variantCount <= 1) return startIndex;
-
-            // --- ESTOCÁSTICO DETERMINISTA ---
-            int seed = Mathf.FloorToInt(position.x * 3f + position.y * 7f + position.z * 13f);
-            
-            // Usamos System.Random o un hash simple
-            int variant = Mathf.Abs(seed) % variantCount;
-
-            return startIndex + variant;
+            // Retorna 0 (o el índice que quieras) temporalmente para evitar el error.
+            // En la Fase 2, Chunk.cs leerá esto desde los BlockDefinitions.
+            return 0;
         }
     }
 }

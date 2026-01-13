@@ -1,408 +1,267 @@
 using System;
 using UnityEngine;
-using UnityEngine.InputSystem;
-using Homebound.Core.Inputs;
 using Homebound.Core;
 using Homebound.Features.TaskSystem;
-using Homebound.Features.Economy;
-using Homebound.Features.AethianAI;
-using Homebound.Features.Navigation;
-using UnityEngine.Serialization;
+using Homebound.Features.VoxelWorld;
+using Homebound.Features.AethianAI; // Necesario para referenciar AethianBot
+using UnityEngine.EventSystems;
 
 namespace Homebound.Features.PlayerInteraction
 {
+    // Definimos los modos de interacción posibles
+    public enum CommandMode
+    {
+        Select = 0,
+        MineSingle = 1,
+        MineArea = 2,
+        Build = 3 // Reservado para futuro
+    }
+
     public class InteractionController : MonoBehaviour
     {
-        // ESTADOS DE INPUT
-        private enum InputMode
-        {
-            Normal,         
-            CommandPending 
-        }
+        // --- EVENTOS QUE ESCUCHA LA UI ---
+        // Esto soluciona el error en UnitDetailsPanel
+        public event Action<AethianBot> OnUnitSelected;
 
-        [Header("References")] 
-        [SerializeField] private Camera _mainCamera;
-        [SerializeField] private Transform _selectionGhost;
+        [Header("Tools & Visuals")]
+        [SerializeField] private GameObject _ghostCursorPrefab;
+        [SerializeField] private LayerMask _terrainLayer;
+        [SerializeField] private LayerMask _unitLayer; // <--- NUEVO: Para detectar NPCs
 
-        [Header("Debug Spawner")]
-        [SerializeField] private GameObject _malePrefab;   
-        [SerializeField] private GameObject _femalePrefab;
+        [Header("Visual Adjustments")]
+        [SerializeField] private bool _useCenterPivot = true;
+        [SerializeField] private Vector3 _cursorOffset = Vector3.zero;
 
-        [FormerlySerializedAs("_terrainLayer")]
-        [Header("Layers")] 
-        [SerializeField] private LayerMask _groundLayer;
-        [SerializeField] private LayerMask _resourceLayer;
-        [SerializeField] private LayerMask _unitLayer;
+        [Header("Settings")]
+        [SerializeField] private float _rayDistance = 100f;
 
-        [Header("Requisitos de Trabajo")]
-        [Tooltip("Arrastra aquí el asset 'Villager_Data'")]
-        [SerializeField] private UnitClassDefinition _requiredWorkerClass;
+        // Estado Interno
+        private CommandMode _currentMode = CommandMode.Select;
+        private GameObject _ghostCursorInstance;
+        private Camera _mainCamera;
 
-        [Header("Tools")] 
-        [SerializeField] private bool _isMiningMode = false;
-
-        // ESTADO INTERNO
-        private RTSInputs _input;
-        private Vector3 _currentGridPos; 
-        private bool _isValidHover;
-        
-        private InputMode _currentMode = InputMode.Normal;
-        private JobType _pendingJobType; 
-
-        private GridManager _gridManager;
-        private JobManager _jobManager;
-
-        public event Action<AethianBot> OnUnitSelected; 
+        // Dragging Data (Para Área)
+        private bool _isDragging = false;
+        private Vector3Int _startDragPos;
+        private Vector3Int _currentDragPos;
 
         private void Awake()
         {
-            _input = new RTSInputs();
-            if (_mainCamera == null) _mainCamera = Camera.main;
+            // Registrar en ServiceLocator si es necesario para que otros lo encuentren
+            ServiceLocator.Register(this);
+        }
+
+        private void OnDestroy()
+        {
+            ServiceLocator.Unregister<InteractionController>();
         }
 
         private void Start()
         {
-            _gridManager = ServiceLocator.Get<GridManager>();
-            _jobManager = ServiceLocator.Get<JobManager>();
-        }
+            _mainCamera = Camera.main;
 
-        private void OnEnable()
-        {
-            _input.Enable();
-            _input.Gameplay.Select.performed += OnLeftClick; 
-            _input.Gameplay.Spawn.performed += OnRightClick; 
-        }
-
-        private void OnDisable()
-        {
-            _input.Disable();
-            _input.Gameplay.Select.performed -= OnLeftClick;
-            _input.Gameplay.Spawn.performed -= OnRightClick;
+            if (_ghostCursorPrefab != null)
+            {
+                _ghostCursorInstance = Instantiate(_ghostCursorPrefab);
+                _ghostCursorInstance.SetActive(false);
+                if (_ghostCursorInstance.TryGetComponent(out Collider c)) Destroy(c);
+            }
         }
 
         private void Update()
         {
-            HandleRaycast();
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+
+            HandleInput();
             UpdateVisuals();
-            
-            if (Input.GetMouseButtonDown(0) && _isMiningMode) // Click Izquierdo
+        }
+
+        // --- API PÚBLICA (Soluciona errores de CommandHUD) ---
+
+        public void SetCommandMode(int modeIndex)
+        {
+            // Conversión segura de int a Enum
+            _currentMode = (CommandMode)Mathf.Clamp(modeIndex, 0, 3);
+            Debug.Log($"[Interaction] Modo cambiado a: {_currentMode}");
+
+            // Resetear estados al cambiar de modo
+            _isDragging = false;
+            if (_ghostCursorInstance) _ghostCursorInstance.SetActive(false);
+        }
+
+        // Sobrecarga para usar con Enum directamente si se prefiere
+        public void SetCommandMode(CommandMode mode)
+        {
+            _currentMode = mode;
+        }
+
+        // Métodos específicos para tus botones anteriores (Backwards Compatibility)
+        public void SetMiningModeSingle() => SetCommandMode(CommandMode.MineSingle);
+        public void SetMiningModeArea() => SetCommandMode(CommandMode.MineArea);
+
+        // ----------------------------------------------------
+
+        private void HandleInput()
+        {
+            // 1. PRIORIDAD: Selección de Unidades (Solo en modo Select o cualquier modo si es click simple)
+            if (Input.GetMouseButtonDown(0) && !_isDragging)
             {
-                HandleMiningClick();
+                if (TrySelectUnit()) return; // Si seleccionamos un NPC, no hacemos nada más (no minamos)
+            }
+
+            // 2. Obtener posición del terreno
+            if (!GetMouseWorldPosition(out Vector3Int gridPos))
+            {
+                if (!_isDragging && _ghostCursorInstance) _ghostCursorInstance.SetActive(false);
+                if (Input.GetMouseButtonUp(0)) _isDragging = false;
+                return;
+            }
+
+            _currentDragPos = gridPos;
+
+            // 3. Lógica según Modo
+            if (Input.GetMouseButtonDown(0))
+            {
+                switch (_currentMode)
+                {
+                    case CommandMode.MineSingle:
+                        RequestMiningJob(gridPos);
+                        break;
+                    case CommandMode.MineArea:
+                        _isDragging = true;
+                        _startDragPos = gridPos;
+                        break;
+                }
+            }
+            else if (Input.GetMouseButtonUp(0))
+            {
+                if (_currentMode == CommandMode.MineArea && _isDragging)
+                {
+                    _isDragging = false;
+                    RequestAreaMining(_startDragPos, _currentDragPos);
+                }
             }
         }
 
-        // --- API PÚBLICA (Llamado desde UI) ---
-        public void SetCommandMode(JobType jobType)
+        private bool TrySelectUnit()
         {
-            _currentMode = InputMode.CommandPending;
-            _pendingJobType = jobType;
-            
-            // Feedback visual opcional: Cambiar cursor, color del ghost, etc.
-            if (_selectionGhost != null) 
+            Ray ray = _mainCamera.ScreenPointToRay(Input.mousePosition);
+            if (Physics.Raycast(ray, out RaycastHit hit, _rayDistance, _unitLayer))
             {
-                // Ejemplo: Podrías cambiar el material del ghost aquí según el jobType
-            }
-        }
-
-        public void CancelCommandMode()
-        {
-            _currentMode = InputMode.Normal;
-            Debug.Log("[Interaction] Modo comando cancelado.");
-        }
-        
-
-        // --- LÓGICA DE INPUT ---
-
-        private void OnLeftClick(InputAction.CallbackContext context)
-        {
-            if (!_isValidHover) return;
-
-            switch (_currentMode)
-            {
-                case InputMode.Normal:
-                    HandleNormalSelection();
-                    break;
-
-                case InputMode.CommandPending:
-                    ExecutePendingCommand();
-                    break;
-            }
-        }
-
-        private void OnRightClick(InputAction.CallbackContext context)
-        {
-            // CLICK DERECHO: Lógica de Cancelación o Acción Secundaria
-            
-            if (_currentMode == InputMode.CommandPending)
-            {
-                // Si estamos preparando una orden, el click derecho CANCELA
-                CancelCommandMode();
-            }
-            else
-            {
-                // Si estamos en modo normal, mantenemos tu lógica de Debug (Spawnear)
-                // Esto se eliminará en producción, pero es útil ahora.
-                SpawnDebugUnit();
-            }
-        }
-
-        // --- MÉTODOS DE ACCIÓN ---
-
-        private void HandleNormalSelection()
-        {
-            Vector2 mouseScreenPos = _input.Gameplay.Point.ReadValue<Vector2>();
-            Ray ray = _mainCamera.ScreenPointToRay(mouseScreenPos);
-
-            // 1. Intentar seleccionar Unidad
-            if (Physics.Raycast(ray, out RaycastHit unitHit, 1000f, _unitLayer))
-            {
-                var bot = unitHit.collider.GetComponentInParent<AethianBot>();
+                AethianBot bot = hit.collider.GetComponentInParent<AethianBot>();
                 if (bot != null)
                 {
-                    Debug.Log($"[Interaction] Unidad seleccionada: {bot.Stats.CharacterName}");
-                    OnUnitSelected?.Invoke(bot);
-                    return;
+                    Debug.Log($"[Interaction] Unidad Seleccionada: {bot.name}");
+                    OnUnitSelected?.Invoke(bot); // Notificar a la UI
+                    return true;
                 }
             }
-
-            // 2. Si no, deseleccionar
-            OnUnitSelected?.Invoke(null);
-        }
-
-        private void ExecutePendingCommand()
-        {
-            if (_jobManager == null) return;
-
-            Transform targetTransform = null;
-            Vector3 targetPos = _currentGridPos;
-            string jobName = $"{_pendingJobType} Order";
-            bool validCommand = true; // Flag para saber si procedemos
-
-            // --- LÓGICA POR TIPO ---
-            
-            // CASO 1: TALAR (Busca entidad IGatherable)
-            if (_pendingJobType == JobType.Chop)
-            {
-                if (TryGetResourceUnderMouse(out var resource))
-                {
-                    targetTransform = resource.Transform;
-                    targetPos = resource.Position;
-                    jobName = $"Talar {resource.Name}";
-                }
-                else
-                {
-                    Debug.LogWarning("[Interaction] Debes hacer clic en un recurso.");
-                    validCommand = false; 
-                }
-            }
-            // CASO 2: MINAR (Busca el Voxel exacto)
-            else if (_pendingJobType == JobType.Mine)
-            {
-                Ray ray = _mainCamera.ScreenPointToRay(_input.Gameplay.Point.ReadValue<Vector2>());
-                
-                // CAMBIO 1: Usamos RaycastAll para atravesar al bot si se interpone
-                RaycastHit[] hits = Physics.RaycastAll(ray, 100f, _groundLayer);
-                
-                // Buscamos el hit más cercano que NO sea una unidad
-                RaycastHit validHit = new RaycastHit();
-                bool found = false;
-                float minDistance = float.MaxValue;
-
-                foreach (var hit in hits)
-                {
-                    // Filtro de seguridad: Si golpeamos algo que tiene UnitMovementController o AethianBot, lo ignoramos
-                    if (hit.collider.GetComponentInParent<UnitMovementController>() != null) continue;
-                    if (hit.collider.isTrigger) continue;
-
-                    if (hit.distance < minDistance)
-                    {
-                        minDistance = hit.distance;
-                        validHit = hit;
-                        found = true;
-                    }
-                }
-
-                if (found)
-                {
-                    // CAMBIO 2: Empujamos un poco más fuerte hacia adentro (0.2f)
-                    Vector3 pointInBlock = validHit.point + (ray.direction * 0.2f);
-                    
-                    targetPos = new Vector3(
-                        Mathf.Floor(pointInBlock.x),
-                        Mathf.Floor(pointInBlock.y),
-                        Mathf.Floor(pointInBlock.z)
-                    );
-                    
-                    // DEBUG CRÍTICO: ¿Qué golpeamos y dónde quedó el target?
-                    Debug.Log($"[Interaction] Raycast golpeó: {validHit.collider.name} en {validHit.point}. Target Calculado: {targetPos}");
-
-                    jobName = "Minar Piedra";
-                }
-                else
-                {
-                    Debug.LogWarning("[Interaction] Raycast de minería no encontró terreno válido (¿Bloqueado por el bot?).");
-                    validCommand = false;
-                }
-            }
-
-            // --- EJECUCIÓN ---
-            
-            if (validCommand)
-            {
-                var job = new JobRequest(
-                    jobName, 
-                    _pendingJobType, 
-                    targetPos, 
-                    targetTransform, 
-                    50,
-                    _requiredWorkerClass
-                );
-                
-                _jobManager.PostJob(job);
-                
-                // Feedback
-                Debug.Log($"[Interaction] Comando '{jobName}' enviado en {targetPos}");
-                
-                // Salir del modo comando
-                _currentMode = InputMode.Normal;
-                CancelCommandMode(); // Limpia visuales si las hubiera
-            }
-        }
-
-        private void SpawnDebugUnit()
-        {
-            if (!_isValidHover) return;
-
-            // LÓGICA DE RANDOMIZACIÓN (50% / 50%)
-            // Random.value devuelve un número entre 0.0 y 1.0.
-            GameObject prefabToSpawn = (UnityEngine.Random.value > 0.5f) ? _malePrefab : _femalePrefab;
-
-            if (prefabToSpawn != null)
-            {
-                // Instanciamos el prefab elegido.
-                // NOTA: Al nacer, el 'Start()' del UnitAppearanceController dentro del prefab
-                // se ejecutará automáticamente, eligiendo ropa, pelo y ojos al azar.
-                Instantiate(prefabToSpawn, _currentGridPos, Quaternion.identity);
-
-                Debug.Log($"[Interaction] Unidad de prueba spawneada ({prefabToSpawn.name}).");
-            }
-            else
-            {
-                Debug.LogWarning("[Interaction] ¡Falta asignar los prefabs Male/Female en el Inspector!");
-            }
-        }
-
-        // --- UTILIDADES ---
-
-        private bool TryGetResourceUnderMouse(out IGatherable resource)
-        {
-            Vector2 mouseScreenPos = _input.Gameplay.Point.ReadValue<Vector2>();
-            Ray ray = _mainCamera.ScreenPointToRay(mouseScreenPos);
-
-            if (Physics.Raycast(ray, out RaycastHit hit, 1000f, _resourceLayer))
-            {
-                resource = hit.collider.GetComponentInParent<IGatherable>();
-                return resource != null;
-            }
-            resource = null;
             return false;
-        }
-
-        private void HandleRaycast()
-        {
-            Vector2 mouseScreenPos = _input.Gameplay.Point.ReadValue<Vector2>();
-            Ray ray = _mainCamera.ScreenPointToRay(mouseScreenPos);
-
-            if (Physics.Raycast(ray, out RaycastHit hit, 1000f, _groundLayer))
-            {
-                int x = Mathf.RoundToInt(hit.point.x);
-                int z = Mathf.RoundToInt(hit.point.z);
-                int yRaw = Mathf.RoundToInt(hit.point.y);
-
-                float finalY = yRaw + 1; 
-
-                if (_gridManager != null)
-                {
-                    for (int yOffset = -2; yOffset <= 2; yOffset++)
-                    {
-                        int checkY = yRaw + yOffset;
-                        PathNode node = _gridManager.GetNode(x, checkY, z);
-                        if (node != null && node.IsWalkableSurface)
-                        {
-                            finalY = checkY;
-                            break;
-                        }
-                    }
-                }
-
-                _currentGridPos = new Vector3(x, finalY, z);
-                _isValidHover = true;
-            }
-            else
-            {
-                _isValidHover = false;
-            }
         }
 
         private void UpdateVisuals()
         {
-            if (_selectionGhost != null)
+            // El cursor fantasma solo se muestra en modos de construcción/minería
+            bool showCursor = _currentMode == CommandMode.MineSingle || _currentMode == CommandMode.MineArea;
+
+            if (_ghostCursorInstance == null) return;
+
+            if (!showCursor)
             {
-                _selectionGhost.gameObject.SetActive(_isValidHover);
-                if (_isValidHover)
+                _ghostCursorInstance.SetActive(false);
+                return;
+            }
+
+            // Si el mouse no toca terreno, ocultar
+            if (!_isDragging && !GetMouseWorldPosition(out Vector3Int _))
+            {
+                _ghostCursorInstance.SetActive(false);
+                return;
+            }
+
+            _ghostCursorInstance.SetActive(true);
+
+            if (_currentMode == CommandMode.MineArea && _isDragging)
+            {
+                // Visualización de Área
+                Vector3Int min = Vector3Int.Min(_startDragPos, _currentDragPos);
+                Vector3Int max = Vector3Int.Max(_startDragPos, _currentDragPos);
+                Vector3 size = (Vector3)(max - min + Vector3Int.one);
+                Vector3 center = min + (size * 0.5f);
+
+                _ghostCursorInstance.transform.position = center + _cursorOffset;
+                _ghostCursorInstance.transform.localScale = size;
+            }
+            else
+            {
+                // Visualización Simple
+                Vector3 targetPos = _currentDragPos;
+                if (_useCenterPivot) targetPos += new Vector3(0.5f, 0.5f, 0.5f);
+
+                _ghostCursorInstance.transform.position = targetPos + _cursorOffset;
+                _ghostCursorInstance.transform.localScale = Vector3.one;
+            }
+        }
+
+        private void RequestAreaMining(Vector3Int start, Vector3Int end)
+        {
+            int minX = Mathf.Min(start.x, end.x);
+            int maxX = Mathf.Max(start.x, end.x);
+            int minY = Mathf.Min(start.y, end.y);
+            int maxY = Mathf.Max(start.y, end.y);
+            int minZ = Mathf.Min(start.z, end.z);
+            int maxZ = Mathf.Max(start.z, end.z);
+
+            var worldData = ServiceLocator.Get<IWorldDataProvider>();
+            int count = 0;
+
+            for (int x = minX; x <= maxX; x++)
+            {
+                for (int y = minY; y <= maxY; y++)
                 {
-                    _selectionGhost.position = _currentGridPos;
-                    // Aquí podrías cambiar el color del ghost si _currentMode == CommandPending
+                    for (int z = minZ; z <= maxZ; z++)
+                    {
+                        Vector3Int pos = new Vector3Int(x, y, z);
+
+                        if (worldData != null)
+                        {
+                            int id = worldData.GetBlockIDAt(pos);
+                            if (id == 0 || id == 4) continue; // No minar aire ni agua
+                        }
+                        RequestMiningJob(pos);
+                        count++;
+                    }
                 }
             }
+            Debug.Log($"[Interaction] Área minada: {count} bloques.");
         }
-        
-        public void SetMiningMode(bool active)
-        {
-            _isMiningMode = active;
-            // Desactivar otros modos si es necesario
-        }
-        private void HandleMiningClick()
-        {
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(ray, out RaycastHit hit, 100f, _groundLayer))
-            {
-                // TRUCO MATEMÁTICO DE VOXELS:
-                // Para saber qué bloque estamos mirando, nos movemos un poquito *dentro* del bloque
-                // siguiendo la dirección del rayo.
-                // Si golpeamos la cara Norte, queremos el bloque que está "dentro" de esa cara.
-                Vector3 pointInBlock = hit.point + (ray.direction * 0.1f);
 
-                int x = Mathf.RoundToInt(pointInBlock.x);
-                int y = Mathf.RoundToInt(pointInBlock.y);
-                int z = Mathf.RoundToInt(pointInBlock.z);
-
-                // Crear el trabajo de minería en esa coordenada
-                CreateMiningJob(new Vector3Int(x, y, z));
-            }
-        }
-        
-        private void CreateMiningJob(Vector3Int pos)
+        private void RequestMiningJob(Vector3Int gridPos)
         {
             var jobManager = ServiceLocator.Get<JobManager>();
-            
-            // Creamos un Job en la posición del bloque
-            // Nota: El bot debe pararse *al lado* o *arriba*, no dentro.
-            // El JobDefinition se encargará de la distancia de interacción.
-            
-            JobRequest miningJob = new JobRequest(
-                "Mine Stone",                      
-                JobType.Mine,                      
-                new Vector3(pos.x, pos.y, pos.z),  
-                null,                              
-                50,
-                _requiredWorkerClass
-            );
+            if (jobManager != null)
+            {
+                Vector3 worldPos = gridPos + new Vector3(0.5f, 0.5f, 0.5f);
+                jobManager.CreateMiningRequest(worldPos);
+            }
+        }
 
-            jobManager.PostJob(miningJob);
-            
-            // Feedback Visual (Opcional): Instanciar un marcador rojo en 'pos'
-            Debug.Log($"[Interaction] Orden de minar creada en {pos}");
+        private bool GetMouseWorldPosition(out Vector3Int gridPos)
+        {
+            Ray ray = _mainCamera.ScreenPointToRay(Input.mousePosition);
+
+            if (Physics.Raycast(ray, out RaycastHit hit, _rayDistance, _terrainLayer))
+            {
+                Vector3 pointInBlock = hit.point - (hit.normal * 0.01f);
+                gridPos = new Vector3Int(
+                    Mathf.FloorToInt(pointInBlock.x),
+                    Mathf.FloorToInt(pointInBlock.y),
+                    Mathf.FloorToInt(pointInBlock.z)
+                );
+                return true;
+            }
+            gridPos = Vector3Int.zero;
+            return false;
         }
     }
 }

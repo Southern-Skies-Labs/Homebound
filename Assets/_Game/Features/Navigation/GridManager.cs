@@ -1,8 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Homebound.Core;
-using NUnit.Framework.Interfaces;
-using UnityEditor.SceneManagement;
 
 namespace Homebound.Features.Navigation
 {
@@ -10,17 +8,26 @@ namespace Homebound.Features.Navigation
     {
         private PathNode[,,] _grid;
         private int _width, _height, _depth;
-        private Vector3Int _gridOriginOffset; 
+        private Vector3Int _gridOriginOffset;
 
         private void Awake() => ServiceLocator.Register(this);
         private void OnDestroy() => ServiceLocator.Unregister<GridManager>();
+
+        private void Start()
+        {
+            // Inicialización automática al arrancar (o llamar manualmente desde GameController)
+            // Aseguramos que el mapa sea lo suficientemente grande para cubrir los chunks
+            InitializeGrid(128, 64, 128); // Ajusta según el tamaño de tu WorldSizeChunks
+
+            // IMPORTANTE: Esperar un frame o llamar esto después de que WorldGenerator termine
+            Invoke(nameof(ScanWorld), 0.1f);
+        }
 
         public void InitializeGrid(int width, int height, int depth)
         {
             _width = width; _height = height; _depth = depth;
             _grid = new PathNode[width, height, depth];
 
-            // Offset: Si width=50, offset es -25. El array [0] corresponde a mundo -25.
             int xOff = width / 2;
             int zOff = depth / 2;
             _gridOriginOffset = new Vector3Int(-xOff, 0, -zOff);
@@ -33,50 +40,70 @@ namespace Homebound.Features.Navigation
                         int worldZ = z + _gridOriginOffset.z;
                         _grid[x, y, z] = new PathNode(worldX, y, worldZ);
                     }
-            
-            Debug.Log($"[GridManager] Grilla 2.0 inicializada: {width}x{height}x{depth}");
+
+            Debug.Log($"[GridManager] Grilla inicializada: {width}x{height}x{depth}");
         }
 
-        public Vector3Int WorldToArray(int x, int y, int z)
+
+        [ContextMenu("Force Scan World")]
+        public void ScanWorld()
         {
-            return new Vector3Int(x - _gridOriginOffset.x, y - _gridOriginOffset.y, z - _gridOriginOffset.z);
-        }
-        // --- API DE RESERVAS ---
-        public bool TryReserve(Vector3Int worldPos, object owner)
-        {
-            PathNode node = GetNode(worldPos.x, worldPos.y, worldPos.z);
+            // 1. Obtener el proveedor desde el Core (Sin dependencia directa a VoxelWorld)
+            var worldProvider = ServiceLocator.Get<IWorldDataProvider>();
 
-            if (node == null) return false;
-            if (node.Type == NodeType.Solid) return false;
-
-            if (node.IsReserved() && node.ReservedBy != owner) return false;
-
-            node.Reserve(owner);
-            return true;
-        }
-
-        public void ClearReservation(Vector3Int worldPos, object owner)
-        {
-            PathNode node = GetNode(worldPos.x, worldPos.y, worldPos.z);
-            if (node != null && node.ReservedBy == owner)
+            if (worldProvider == null)
             {
-                node.ClearReservation();
+                Debug.LogError("[GridManager] No se encontró un IWorldDataProvider registrado.");
+                return;
             }
+
+            for (int x = 0; x < _width; x++)
+            {
+                for (int z = 0; z < _depth; z++)
+                {
+                    for (int y = 0; y < _height; y++)
+                    {
+                        Vector3Int worldPos = new Vector3Int(x + _gridOriginOffset.x, y, z + _gridOriginOffset.z);
+
+                        // 2. Usar la interfaz para consultar
+                        int blockID = worldProvider.GetBlockIDAt(worldPos);
+
+                        // 3. Interpretar ID
+                        NodeType type = NodeType.Air;
+                        if (blockID == 1) type = NodeType.Solid;
+                        else if (blockID == 2) type = NodeType.Water;
+
+                        SetNodeInternal(x, y, z, type);
+                    }
+                }
+            }
+
+            RefreshAllWalkability();
+            Debug.Log("[GridManager] Mundo escaneado vía Interfaz.");
         }
 
-        // --- API DE ACTUALIZACIÓN ---
         public void SetNode(int worldX, int worldY, int worldZ, NodeType type)
         {
             Vector3Int idx = WorldToArray(worldX, worldY, worldZ);
-            if (!CheckIndexBounds(idx.x, idx.y, idx.z)) return;
+            SetNodeInternal(idx.x, idx.y, idx.z, type);
 
-            PathNode node = _grid[idx.x, idx.y, idx.z];
-            node.Type = type;
-            node.MovementPenalty = (type == NodeType.Road) ? 0.5f : 1.0f;
-
-            // Recalcular si este nodo y el de ARRIBA son superficies caminables
+            // Actualizar vecindad local inmediata
             UpdateWalkability(idx.x, idx.y, idx.z);
-            UpdateWalkability(idx.x, idx.y + 1, idx.z); 
+            UpdateWalkability(idx.x, idx.y + 1, idx.z);
+        }
+
+        private void SetNodeInternal(int x, int y, int z, NodeType type)
+        {
+            if (!CheckIndexBounds(x, y, z)) return;
+            _grid[x, y, z].Type = type;
+        }
+
+        private void RefreshAllWalkability()
+        {
+            for (int x = 0; x < _width; x++)
+                for (int z = 0; z < _depth; z++)
+                    for (int y = 0; y < _height; y++)
+                        UpdateWalkability(x, y, z);
         }
 
         private void UpdateWalkability(int ix, int iy, int iz)
@@ -87,26 +114,59 @@ namespace Homebound.Features.Navigation
             PathNode below = GetNodeByIndex(ix, iy - 1, iz);
             PathNode above = GetNodeByIndex(ix, iy + 1, iz);
 
-            // REGLA DE ORO:
-            // 1. Yo soy AIRE (no muro).
-            // 2. Abajo hay SÓLIDO (suelo).
-            // 3. Arriba hay AIRE (espacio cabeza).
-            
-            bool isSolid = (node.Type != NodeType.Air);
-            bool isSolidBelow = (below != null && below.Type != NodeType.Air);
-            bool isHeadClear = (above == null || above.Type == NodeType.Air);
+            // --- REGLAS DE NAVEGACIÓN v0.3.5 ---
 
-            node.IsWalkableSurface = !isSolid && isSolidBelow && isHeadClear;
+            bool walkable = false;
+            float penalty = 0;
+
+            // CASO 1: Tierra Firme
+            // Yo soy Aire, Abajo Sólido, Arriba Aire
+            if (node.Type == NodeType.Air && below != null && below.Type == NodeType.Solid && (above == null || above.Type == NodeType.Air))
+            {
+                walkable = true;
+                penalty = 0;
+            }
+            // CASO 2: Agua Poco Profunda (Riachuelo)
+            // Yo soy Agua, Abajo es Sólido (Profundidad 1)
+            else if (node.Type == NodeType.Water && below != null && below.Type == NodeType.Solid)
+            {
+                walkable = true;
+                penalty = 10; // Costo alto por caminar en agua
+            }
+            // CASO 3: Agua Profunda
+            // Yo soy Agua, Abajo es Agua -> NO CAMINABLE
+            else if (node.Type == NodeType.Water && below != null && below.Type == NodeType.Water)
+            {
+                walkable = false;
+            }
+
+            node.IsWalkableSurface = walkable;
+            node.MovementPenalty = penalty;
         }
 
-        // --- LÓGICA DE VECINOS ---
-        
-        public List<PathNode> GetNeighbors(PathNode node)
+        // ... (Resto de métodos: WorldToArray, TryReserve, GetNeighbors mantienen igual) ...
+
+        public Vector3Int WorldToArray(int x, int y, int z)
         {
-            return GetNeighbors(node, false);
+            return new Vector3Int(x - _gridOriginOffset.x, y - _gridOriginOffset.y, z - _gridOriginOffset.z);
         }
-        
-        public List<PathNode> GetNeighbors(PathNode node, bool useEmergencyRules)
+
+        public bool TryReserve(Vector3Int worldPos, object owner)
+        {
+            PathNode node = GetNode(worldPos.x, worldPos.y, worldPos.z);
+            if (node == null || !node.IsWalkableSurface) return false; // Solo reservar caminables
+            if (node.IsReserved() && node.ReservedBy != owner) return false;
+            node.Reserve(owner);
+            return true;
+        }
+
+        public void ClearReservation(Vector3Int worldPos, object owner)
+        {
+            PathNode node = GetNode(worldPos.x, worldPos.y, worldPos.z);
+            if (node != null && node.ReservedBy == owner) node.ClearReservation();
+        }
+
+        public List<PathNode> GetNeighbors(PathNode node, bool useEmergencyRules = false)
         {
             List<PathNode> neighbors = new List<PathNode>();
             int[] xDir = { 0, 1, 0, -1 };
@@ -118,33 +178,17 @@ namespace Homebound.Features.Navigation
             {
                 int nx = centerIdx.x + xDir[i];
                 int nz = centerIdx.z + zDir[i];
-                
+
+                // Revisamos nivel actual, abajo y arriba (para escaleras/saltos)
                 for (int yOffset = -1; yOffset <= 1; yOffset++)
                 {
                     int ny = centerIdx.y + yOffset;
-                    
                     PathNode neighbor = GetNodeByIndex(nx, ny, nz);
-                    
-                    if (neighbor == null) continue;
-                    
-                    bool isStandardWalkable = neighbor.IsWalkableSurface;
-                    
-                    bool isEmergencyWalkable = false;
-                    
-                    if (useEmergencyRules && !isStandardWalkable)
-                    {
-                        if (neighbor.Type == NodeType.Air)
-                        {
-                            PathNode above = GetNodeByIndex(nx, ny + 1, nz);
-                            
-                            if (above == null || above.Type == NodeType.Air)
-                            {
-                                isEmergencyWalkable = true;
-                            }
-                        }
-                    }
 
-                    if (isStandardWalkable || isEmergencyWalkable)
+                    if (neighbor == null) continue;
+
+                    // Si es caminable (ya calculado en UpdateWalkability)
+                    if (neighbor.IsWalkableSurface)
                     {
                         neighbors.Add(neighbor);
                     }
