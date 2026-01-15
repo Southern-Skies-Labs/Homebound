@@ -24,6 +24,8 @@ MonoBehaviour:
     positionOffset: {x: 0, y: -0.01428, z: 0}
     rotationOffset: {x: 0, y: 0, z: 0}
     scaleOverride: {x: 0.01, y: 0.01, z: 0.01}
+  DefaultOutfits:
+  - {fileID: 2198538498653765492, guid: 25246f7e4ea8d9c439d1691cd7d1903d, type: 3}
   SkinMaterials:
   - {fileID: 2100000, guid: 7bab792df1cc7254da001842c09cf2bf, type: 2}
   - {fileID: 2100000, guid: cb1783fa0b1dd3e4a9308aa629f325ed, type: 2}

@@ -3,43 +3,15 @@ using System.Linq;
 using UnityEngine;
 using Homebound.Core;
 
+
 namespace Homebound.Features.TaskSystem
 {
     public class JobManager : MonoBehaviour
     {
-        [Header("Job Settings")]
-        [Tooltip("La profesión requerida para trabajos de minería (ej: Villager o Miner)")]
-        [SerializeField] private UnitClassDefinition _minerClassDef;
-
         private List<JobRequest> _allJobs = new List<JobRequest>();
 
         private void Awake() => ServiceLocator.Register(this);
         private void OnDestroy() => ServiceLocator.Unregister<JobManager>();
-
-        // --- MÉTODO CORREGIDO ---
-        public void CreateMiningRequest(Vector3 position)
-        {
-            if (_minerClassDef == null)
-            {
-                Debug.LogError("[JobManager] Error: No has asignado '_minerClassDef' en el inspector.");
-                return;
-            }
-
-            // CORRECCIÓN: Usamos el constructor exacto que pide el compilador (6 argumentos)
-            // Firma: (string, JobType, Vector3, Transform, int, UnitClassDefinition)
-            JobRequest miningJob = new JobRequest(
-                "Mining Command",       // 1. Nombre
-                JobType.Mine,           // 2. Tipo (Asumiendo que JobType.Mine existe)
-                position,               // 3. Posición
-                null,                   // 4. Target Transform (Null porque es un bloque estático)
-                10,                     // 5. Prioridad
-                _minerClassDef          // 6. Clase Requerida
-            );
-
-            PostJob(miningJob);
-            // Debug.Log($"[JobManager] Orden de minería creada en {position}");
-        }
-        // ------------------------
 
         public void PostJob(JobRequest job)
         {
@@ -102,5 +74,6 @@ namespace Homebound.Features.TaskSystem
                 job.ReturnToQueue();
             }
         }
+
     }
 }

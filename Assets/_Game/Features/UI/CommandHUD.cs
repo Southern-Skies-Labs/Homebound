@@ -1,42 +1,53 @@
+using System;
 using UnityEngine;
+using UnityEngine.UI;
 using Homebound.Core;
 using Homebound.Features.PlayerInteraction;
+using Homebound.Features.TaskSystem;
 
 namespace Homebound.Features.UI
 {
     public class CommandHUD : MonoBehaviour
     {
-        private InteractionController _interaction;
+        [Header("UI References")]
+        [SerializeField] private Button _btnMove;
+        [SerializeField] private Button _btnChop;
+
+        private InteractionController _interactionController;
 
         private void Start()
         {
-            // Buscamos el controlador al inicio
-            _interaction = ServiceLocator.Get<InteractionController>();
+            _interactionController = FindFirstObjectByType<InteractionController>();
 
-            if (_interaction == null)
+            if (_interactionController == null)
             {
-                Debug.LogError("[CommandHUD] CRÍTICO: No se encontró InteractionController. Asegúrate de que existe en la escena.");
+                Debug.LogError("[CommandHUD] No se encontró InteractionController.");
+                return;
+            }
+
+            _btnMove.onClick.AddListener(() => SetCommandMode(JobType.Move));
+            _btnChop.onClick.AddListener(() => SetCommandMode(JobType.Chop));
+        }
+
+        private void SetCommandMode(JobType jobType)
+        {
+            Debug.Log($"[CommandHUD] Modo seleccionado: {jobType}");
+            _interactionController.SetCommandMode(jobType);
+        }
+
+        public void OnMineClicked()
+        {
+            if (_interactionController != null)
+            {
+                _interactionController.SetCommandMode(JobType.Mine);
+                Debug.Log("[UI] Modo Minería activado. Selecciona un bloque.");
             }
         }
 
-        // --- MÉTODOS PÚBLICOS (Estos sí aparecerán en el Inspector) ---
-
-        public void OnClick_SelectMode()
+        private void OnDestroy()
         {
-            Debug.Log("[UI] Click: Seleccionar");
-            if (_interaction != null) _interaction.SetCommandMode(CommandMode.Select);
-        }
-
-        public void OnClick_MineSingle()
-        {
-            Debug.Log("[UI] Click: Minar (Simple)");
-            if (_interaction != null) _interaction.SetCommandMode(CommandMode.MineSingle);
-        }
-
-        public void OnClick_MineArea()
-        {
-            Debug.Log("[UI] Click: Minar (Área)");
-            if (_interaction != null) _interaction.SetCommandMode(CommandMode.MineArea);
+            _btnChop.onClick.RemoveAllListeners();
+            _btnMove.onClick.RemoveAllListeners();
         }
     }
 }

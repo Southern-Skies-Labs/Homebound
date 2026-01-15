@@ -123,7 +123,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _nodeName: Oak Tree
   _resourceType: {fileID: 11400000, guid: f1bdd609aa6c5d746a2eb991c2e715fc, type: 2}
-  _maxHealth: 100
+  _maxHealth: 10
   _currentHealth: 0
   _amountToDrop: 5
   _maxWorkers: 2
