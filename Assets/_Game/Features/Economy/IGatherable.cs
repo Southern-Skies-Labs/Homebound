@@ -9,7 +9,7 @@ namespace Homebound.Features.Economy
         Transform Transform { get; }
         bool IsDepleted { get; }
 
-      int Gather(float efficiency);
+        int Gather(float efficiency);
 
         InventorySlot GetDrop(); 
     }

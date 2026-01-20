@@ -245,7 +245,7 @@ MonoBehaviour:
   Health: 100
   MaxHealth: 100
   MetabolismRate: 1
-  GatheringPower: 1
+  GatheringPower: 10
   Hunger:
     Name: Hambre
     Value: 100

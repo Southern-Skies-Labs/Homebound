@@ -1,13 +1,16 @@
+using Homebound.Core;
+using Homebound.Core.Inputs;
+using Homebound.Features.AethianAI;
+using Homebound.Features.Economy;
+using Homebound.Features.Navigation;
+using Homebound.Features.TaskSystem;
 using System;
+using System.Resources;
+using Unity.VisualScripting.TextureAssets;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using Homebound.Core.Inputs;
-using Homebound.Core;
-using Homebound.Features.TaskSystem;
-using Homebound.Features.Economy;
-using Homebound.Features.AethianAI;
-using Homebound.Features.Navigation;
 using UnityEngine.Serialization;
+using static Codice.Client.Commands.WkTree.WorkspaceTreeNode;
 
 namespace Homebound.Features.PlayerInteraction
 {
@@ -107,7 +110,7 @@ namespace Homebound.Features.PlayerInteraction
         public void CancelCommandMode()
         {
             _currentMode = InputMode.Normal;
-            Debug.Log("[Interaction] Modo comando cancelado.");
+            //Debug.Log("[Interaction] Modo comando cancelado.");
         }
 
 
@@ -273,15 +276,10 @@ namespace Homebound.Features.PlayerInteraction
         {
             if (!_isValidHover) return;
 
-            // LÓGICA DE RANDOMIZACIÓN (50% / 50%)
-            // Random.value devuelve un número entre 0.0 y 1.0.
             GameObject prefabToSpawn = (UnityEngine.Random.value > 0.5f) ? _malePrefab : _femalePrefab;
 
             if (prefabToSpawn != null)
             {
-                // Instanciamos el prefab elegido.
-                // NOTA: Al nacer, el 'Start()' del UnitAppearanceController dentro del prefab
-                // se ejecutará automáticamente, eligiendo ropa, pelo y ojos al azar.
                 Instantiate(prefabToSpawn, _currentGridPos, Quaternion.identity);
 
                 Debug.Log($"[Interaction] Unidad de prueba spawneada ({prefabToSpawn.name}).");
@@ -348,13 +346,45 @@ namespace Homebound.Features.PlayerInteraction
         {
             if (_selectionGhost != null)
             {
-                _selectionGhost.gameObject.SetActive(_isValidHover);
-                if (_isValidHover)
+                Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+
+                if (Physics.Raycast(ray, out RaycastHit resourceHit, 100f, _resourceLayer))
                 {
-                    _selectionGhost.position = _currentGridPos;
-                    // Aquí podrías cambiar el color del ghost si _currentMode == CommandPending
+                    _selectionGhost.gameObject.SetActive(true);
+                    // Nos pegamos al centro del objeto golpeado (el árbol), no al grid
+                    _selectionGhost.position = resourceHit.transform.position;
+                    _selectionGhost.localScale = Vector3.one * 1.2f; // Un poco más grande para feedback
+                    return; // Salimos, ya encontramos objetivo
                 }
             }
+            if (GetMouseWorldPosition(out Vector3 p))
+            {
+                _selectionGhost.gameObject.SetActive(true);
+                _selectionGhost.position = SnapToGrid(p);
+                _selectionGhost.localScale = Vector3.one;
+            }
+            else
+            {
+                _selectionGhost.gameObject.SetActive(false);
+            }
+        }
+
+
+        private bool GetMouseWorldPosition(out Vector3 point)
+        {
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            if (Physics.Raycast(ray, out RaycastHit hit, 100f, _groundLayer))
+            {
+                point = hit.point - (hit.normal * 0.1f);
+                return true;
+            }
+            point = Vector3.zero;
+            return false;
+        }
+
+        private Vector3 SnapToGrid(Vector3 rawPos)
+        {
+            return new Vector3(Mathf.Floor(rawPos.x) + 0.5f, Mathf.Floor(rawPos.y) + 0.5f, Mathf.Floor(rawPos.z) + 0.5f);
         }
 
         public void SetMiningMode(bool active)
@@ -367,10 +397,6 @@ namespace Homebound.Features.PlayerInteraction
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             if (Physics.Raycast(ray, out RaycastHit hit, 100f, _groundLayer))
             {
-                // TRUCO MATEMÁTICO DE VOXELS:
-                // Para saber qué bloque estamos mirando, nos movemos un poquito *dentro* del bloque
-                // siguiendo la dirección del rayo.
-                // Si golpeamos la cara Norte, queremos el bloque que está "dentro" de esa cara.
                 Vector3 pointInBlock = hit.point + (ray.direction * 0.1f);
 
                 int x = Mathf.RoundToInt(pointInBlock.x);
@@ -404,5 +430,10 @@ namespace Homebound.Features.PlayerInteraction
             // Feedback Visual (Opcional): Instanciar un marcador rojo en 'pos'
             Debug.Log($"[Interaction] Orden de minar creada en {pos}");
         }
+
+
+
+
     }
+
 }
