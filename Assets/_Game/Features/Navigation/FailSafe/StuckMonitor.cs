@@ -3,91 +3,97 @@ using System;
 
 namespace Homebound.Features.Navigation.FailSafe
 {
-    /// <summary>
-    /// Componente pasivo que rastrea el progreso de movimiento.
-    /// Es controlado por UnitMovementController para permitir una "Respuesta Graduada" (Tiered Response).
-    /// </summary>
     [RequireComponent(typeof(UnitMovementController))]
     public class StuckMonitor : MonoBehaviour
     {
         [Header("Sensitivity Settings")]
-        [Tooltip("Tiempo sin moverse antes de considerar un bloqueo leve")]
-        [SerializeField] private float _softStuckTime = 1.0f;
+        [Tooltip("Intervalo en segundos para verificar el progreso del movimiento")]
+        [SerializeField] private float _checkInterval = 2.0f;
 
-        [Tooltip("Tiempo sin moverse antes de considerar un bloqueo moderado (repath)")]
-        [SerializeField] private float _mediumStuckTime = 3.0f;
+        [Tooltip("Distancia minima que debe haberse movido en el invervalo para considerarse válido")] 
+        [SerializeField] private float _minProgressThreshold = 0.5f;
 
-        [Tooltip("Tiempo sin moverse antes de declarar bloqueo crítico (hard stuck)")]
-        [SerializeField] private float _hardStuckTime = 5.0f;
+        [Tooltip("Numero de fallos consecutivos antes de declarar que la unidad está atascada")] 
+        [SerializeField] private int _maxStuckStrikes = 3;
 
-        [Tooltip("Distancia mínima que debe moverse para resetear el timer")]
-        [SerializeField] private float _movementThreshold = 0.1f;
+        public event Action OnStuckDetected;
 
-        public event Action OnSoftStuck;   // Tier 1: Nudge
-        public event Action OnMediumStuck; // Tier 2: Repath
-        public event Action OnHardStuck;   // Tier 3: FailSafe Strategy
-
-        private Vector3 _lastPosition;
-        private float _stuckTimer;
-        private bool _isMonitoring;
+        private UnitMovementController _mover;
+        private Vector3 _lastCheckPosition;
+        private float _timer;
+        private int _currentStrikes;
+        
+        private void Awake()
+        {
+            _mover = GetComponent<UnitMovementController>();
+        }
 
         private void Start()
         {
-            _lastPosition = transform.position;
+            _lastCheckPosition = transform.position;
         }
 
-        /// <summary>
-        /// Llamado cada frame por UnitMovementController cuando intenta moverse.
-        /// </summary>
-        public void CheckStuck(float deltaTime)
+        private void Update()
         {
-            if (Vector3.Distance(transform.position, _lastPosition) > _movementThreshold)
+            // Si no se mueve, reseteamos el monitor de movimiento físico...
+            if (!_mover.IsMoving)
             {
-                // Se movió, reseteamos
-                _stuckTimer = 0f;
-                _lastPosition = transform.position;
+                ResetMonitor();
                 return;
             }
 
-            _stuckTimer += deltaTime;
+            _timer += Time.deltaTime;
 
-            // --- EVALUACIÓN DE NIVELES ---
-
-            // Tier 1: Nudge
-            if (_stuckTimer >= _softStuckTime && _stuckTimer < _mediumStuckTime)
+            if (_timer >= _checkInterval)
             {
-                // Disparamos evento solo una vez por ciclo (opcional, o continuo)
-                // Aquí lo haremos continuo para intentar 'empujar'
-                OnSoftStuck?.Invoke();
-            }
-            // Tier 2: Repath
-            else if (_stuckTimer >= _mediumStuckTime && _stuckTimer < _hardStuckTime)
-            {
-                 // Solo invocamos una vez al cruzar el umbral para no spammear pathfinding
-                if (Mathf.Abs(_stuckTimer - _mediumStuckTime) < deltaTime * 2)
-                {
-                     OnMediumStuck?.Invoke();
-                }
-            }
-            // Tier 3: Hard Stuck
-            else if (_stuckTimer >= _hardStuckTime)
-            {
-                Debug.LogError($"[StuckMonitor] {name} HARD STUCK detected (> {_hardStuckTime}s). Escalating.");
-                OnHardStuck?.Invoke();
-                ResetMonitor(); // Reiniciamos para dar chance al FailSafe de actuar
+                CheckProgress();
+                _timer = 0f;
             }
         }
 
+        
         public void ReportPathfindingFailure()
         {
-            Debug.LogWarning($"[StuckMonitor] {name}: Fallo inmediato de ruta. Escalando a HardStuck.");
-            OnHardStuck?.Invoke();
+            Debug.LogWarning($"[StuckMonitor] {name}: Reporte de fallo crítico de ruta (Sin camino posible). Forzando estado de ATASCO.");
+            
+            TriggerStuckEvent();
+        }
+        
+
+        private void CheckProgress()
+        {
+            float distanceTraveled = Vector3.Distance(transform.position, _lastCheckPosition);
+
+            if (distanceTraveled < _minProgressThreshold)
+            {
+                _currentStrikes++;
+                Debug.LogWarning($"[StuckMonitor] {name} parece atascado físicamente. Strike {_currentStrikes}/{_maxStuckStrikes}.");
+                
+                if (_currentStrikes >= _maxStuckStrikes)
+                {
+                    TriggerStuckEvent();
+                }
+            }
+            else
+            {
+                _currentStrikes = 0;
+            }
+
+            _lastCheckPosition = transform.position;
         }
 
-        public void ResetMonitor()
+        private void TriggerStuckEvent()
         {
-            _stuckTimer = 0f;
-            _lastPosition = transform.position;
+            Debug.LogError($"[StuckMonitor] ¡ALERTA! {name} está totalmente atascado. Solicitando intervención.");
+            OnStuckDetected?.Invoke();
+            ResetMonitor();
+        }
+
+        private void ResetMonitor()
+        {
+            _currentStrikes = 0;
+            _timer = 0f;
+            _lastCheckPosition = transform.position;
         }
     }
 }

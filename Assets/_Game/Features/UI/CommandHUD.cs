@@ -10,9 +10,8 @@ namespace Homebound.Features.UI
     public class CommandHUD : MonoBehaviour
     {
         [Header("UI References")]
-        [SerializeField] private Button _btnMove; // Deprecated/Debug
-        [SerializeField] private Button _btnChop; // Deprecated/Debug
-        [SerializeField] private Button _btnMine; // Nuevo botón de minería
+        [SerializeField] private Button _btnMove;
+        [SerializeField] private Button _btnChop;
 
         private InteractionController _interactionController;
 
@@ -26,37 +25,29 @@ namespace Homebound.Features.UI
                 return;
             }
 
-            // Mapeos temporales para mantener funcionalidad existente si es necesaria
-            // Idealmente deberíamos migrar Move y Chop a Tools también si se van a usar.
-            // Por ahora, solo conectamos la Minería.
+            _btnMove.onClick.AddListener(() => SetCommandMode(JobType.Move));
+            _btnChop.onClick.AddListener(() => SetCommandMode(JobType.Chop));
+        }
 
-            if (_btnMine != null)
-            {
-                _btnMine.onClick.AddListener(OnMineClicked);
-            }
+        private void SetCommandMode(JobType jobType)
+        {
+            Debug.Log($"[CommandHUD] Modo seleccionado: {jobType}");
+            _interactionController.SetCommandMode(jobType);
         }
 
         public void OnMineClicked()
         {
             if (_interactionController != null)
             {
-                _interactionController.SetMiningTool();
-                Debug.Log("[UI] Modo Minería (Área) Activado.");
-            }
-        }
-
-        // Método para volver a inspección (podría ser botón Cancel o Esc)
-        public void OnCancelClicked()
-        {
-            if (_interactionController != null)
-            {
-                _interactionController.SetInspectionTool();
+                _interactionController.SetCommandMode(JobType.Mine);
+                Debug.Log("[UI] Modo Minería activado. Selecciona un bloque.");
             }
         }
 
         private void OnDestroy()
         {
-            if (_btnMine != null) _btnMine.onClick.RemoveListener(OnMineClicked);
+            _btnChop.onClick.RemoveAllListeners();
+            _btnMove.onClick.RemoveAllListeners();
         }
     }
 }
