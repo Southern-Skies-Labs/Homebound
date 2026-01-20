@@ -32,6 +32,7 @@ namespace Homebound.Features.Visuals
 
         private void HandleStateChange(string stateName)
         {
+
             // Lógica simple: Si trabajamos, buscamos si hay herramienta para ese estado.
             // Si salimos de trabajar (Idle, Sleep), escondemos todo.
 
