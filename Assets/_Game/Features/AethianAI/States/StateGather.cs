@@ -2,21 +2,19 @@ using UnityEngine;
 using Homebound.Core;
 using Homebound.Features.TaskSystem;
 using Homebound.Features.Economy;
+using Homebound.Features.AethianAI.Strategies;
+using Homebound.Features.AethianAI.Strategies.Gathering;
 
 namespace Homebound.Features.AethianAI
 {
     public class StateGather : AethianState
     {
-        private ResourceNode _targetNode;
+        private IGatherStrategy _currentStrategy;
         private StorageContainer _targetStorage;
-        
-        private float _gatherTimer;
-        private bool _isGathering;
         private bool _isDepositing; 
 
         // Configuración
-        private const float INTERACTION_RANGE = 2.5f;
-        private const float GATHER_INTERVAL = 1.0f;
+        private const float INTERACTION_RANGE = 2.0f; // Rango para interactuar con almacenes
         private const int MAX_CARRY_AMOUNT = 20; 
 
         public StateGather(AethianBot bot) : base(bot) { }
@@ -31,7 +29,14 @@ namespace Homebound.Features.AethianAI
                 return;
             }
 
-            FindTargetNode();
+            // Usamos la Factory para obtener la estrategia correcta (Mine vs Chop)
+            _currentStrategy = GatherStrategyFactory.Create(_bot.CurrentJob.Type);
+
+            if (_currentStrategy == null || !_currentStrategy.IsJobValid(_bot.CurrentJob))
+            {
+                Debug.LogWarning($"[StateGather] Estrategia inválida o trabajo corrupto para {_bot.CurrentJob.Type}");
+                CompleteJob();
+            }
         }
 
         public override void Tick()
@@ -42,89 +47,80 @@ namespace Homebound.Features.AethianAI
             }
             else
             {
-                HandleGatherSequence();
+                HandleWorkSequence();
             }
         }
 
-        //SECUENCIA DE RECOLECCIÓN
+        // --- FASE DE TRABAJO (Delegada a Estrategia) ---
 
-        private void HandleGatherSequence()
+        private void HandleWorkSequence()
         {
-            if (_targetNode == null)
+            // 1. Verificar validez continua
+            if (_bot.CurrentJob == null || !_currentStrategy.IsJobValid(_bot.CurrentJob))
             {
-                StartDepositSequence(); 
+                // Si ya no es válido, puede que se haya completado o cancelado externamente
+                StartDepositSequence(); // Intentamos depositar lo que tengamos
                 return;
             }
-            
-            if (!_isGathering)
-            {
-                float distanceFlat = Vector2.Distance(
-                    new Vector2(_bot.Position.x, _bot.Position.z),
-                    new Vector2(_targetNode.transform.position.x, _targetNode.transform.position.z)
-                );
 
-                if (distanceFlat <= INTERACTION_RANGE)
+            // 2. Movimiento hacia el objetivo de trabajo
+            Vector3 targetPos = _currentStrategy.GetWorkPosition(_bot.CurrentJob, _bot.Position);
+            float dist = Vector3.Distance(_bot.Position, targetPos);
+
+            // Nota: Usamos una distancia pequeña para "llegar", pero confiamos en HasReachedDestination
+            // Si el bot está parado y cerca, ejecutamos.
+            if (dist <= INTERACTION_RANGE)
+            {
+                _bot.StopMoving();
+
+                // 3. Ejecutar trabajo
+                bool finished = _currentStrategy.ExecuteWork(_bot, Time.deltaTime);
+
+                // 4. Chequear inventario (Capacidad)
+                CheckInventoryCapacity();
+
+                // 5. Si la estrategia dice que terminó (rompió el bloque/árbol)
+                if (finished)
                 {
-                    _bot.StopMoving();
-                    Vector3 lookTarget = _targetNode.transform.position;
-                    lookTarget.y = _bot.Position.y;
-                    _bot.transform.LookAt(lookTarget);
-                    _isGathering = true;
-                }
-                else
-                {
-                    if (!_bot.HasReachedDestination()) 
-                        _bot.MoveTo(_targetNode.transform.position);
+                    StartDepositSequence();
                 }
             }
             else
             {
-                _gatherTimer += Time.deltaTime;
-                if (_gatherTimer >= GATHER_INTERVAL)
+                if (!_bot.HasReachedDestination())
                 {
-                    _gatherTimer = 0f;
-                    PerformGatherHit();
+                    _bot.MoveTo(targetPos);
                 }
             }
         }
 
-        private void PerformGatherHit()
+        private void CheckInventoryCapacity()
         {
-            if (_targetNode == null) return;
-            
-            float damage = _bot.Stats.GatheringPower; 
-            int amount = _targetNode.Gather(damage); 
-
-            if (amount > 0)
+            if (_bot.TryGetComponent(out UnitInventory inventory))
             {
-                if (_bot.TryGetComponent(out UnitInventory inventory))
+                if (inventory.IsFull || inventory.TotalCount >= MAX_CARRY_AMOUNT)
                 {
-                    ItemData itemType = _targetNode.GetDrop().Item; 
-                    inventory.Add(itemType, amount);
-                    
-                    int currentCount = inventory.Count(itemType);
-                    if (currentCount >= MAX_CARRY_AMOUNT)
-                    {
-                        // Debug.Log($"[StateGather] Inventario lleno ({currentCount}). Regresando a depositar.");
-                        StartDepositSequence();
-                        return;
-                    }
+                    StartDepositSequence();
                 }
-            }
-            
-            if (_targetNode.IsDepleted)
-            {
-                StartDepositSequence();
             }
         }
 
-        //SECUENCIA DE DEPÓSITO
+        // --- FASE DE DEPÓSITO (Común) ---
 
         private void StartDepositSequence()
         {
             _isDepositing = true;
-            _isGathering = false;
             _bot.StopMoving();
+
+            // Si tenemos inventario vacío, no tiene sentido ir al almacén, terminamos el trabajo.
+            if (_bot.TryGetComponent(out UnitInventory inventory))
+            {
+                if (inventory.TotalCount == 0)
+                {
+                    CompleteJob();
+                    return;
+                }
+            }
             
             var economy = ServiceLocator.Get<EconomyManager>();
             if (economy != null)
@@ -138,7 +134,7 @@ namespace Homebound.Features.AethianAI
             }
             else
             {
-                Debug.LogWarning($"[StateGather] {_bot.name} no encontró almacén. Se queda con los recursos.");
+                Debug.LogWarning($"[StateGather] {_bot.name} no encontró almacén. Completando trabajo con recursos encima.");
                 CompleteJob(); 
             }
         }
@@ -159,70 +155,34 @@ namespace Homebound.Features.AethianAI
                 // TRANSFERENCIA
                 if (_bot.TryGetComponent(out UnitInventory inventory))
                 {
-                    bool transferSuccess = inventory.TransferAllTo(_targetStorage);
-                    if (transferSuccess)
-                    {
-                        // Debug.Log($"[StateGather] Recursos depositados en {_targetStorage.name}.");
-                    }
+                    inventory.TransferAllTo(_targetStorage);
                 }
                 
-                if (_targetNode != null && !_targetNode.IsDepleted)
-                {
-                    _isDepositing = false;
-                    _targetStorage = null;
-                    _bot.MoveTo(_targetNode.transform.position);
-                }
-                else
-                {
-                    CompleteJob();
-                }
-            }
-        }
-
-        //UTILIDADES
-
-        private void FindTargetNode()
-        {
-            Collider[] hits = Physics.OverlapSphere(_bot.CurrentJob.Position, 1.0f);
-            foreach (var hit in hits)
-            {
-                var node = hit.GetComponentInParent<ResourceNode>();
-                if (node != null)
-                {
-                    _targetNode = node;
-                    break;
-                }
-            }
-
-            if (_targetNode == null)
-            {
+                // Trabajo Completado exitosamente
                 CompleteJob();
-                return;
             }
-
-            _bot.MoveTo(_targetNode.transform.position);
         }
+
+        // --- UTILIDADES ---
 
         private void CompleteJob()
         {
             if (_bot.CurrentJob != null) _bot.CurrentJob.Complete();
             
             _bot.CurrentJob = null;
-            _targetNode = null;
             _bot.ChangeState(_bot.StateIdle);
         }
 
         private void ResetState()
         {
-            _isGathering = false;
             _isDepositing = false;
-            _gatherTimer = 0f;
-            _targetNode = null;
             _targetStorage = null;
+            _currentStrategy = null;
         }
 
         public override void Exit()
         {
+            if (_currentStrategy != null) _currentStrategy.OnCancel(_bot);
             _bot.StopMoving();
             ResetState();
         }
