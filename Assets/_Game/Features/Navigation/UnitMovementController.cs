@@ -22,6 +22,7 @@ namespace Homebound.Features.Navigation
         public bool IsMoving { get; private set; }
         private Rigidbody _rb;
         private StuckMonitor _stuckMonitor;
+        private Vector3 _currentDestination;
 
         private void Awake()
         {
@@ -29,6 +30,11 @@ namespace Homebound.Features.Navigation
             _rb = GetComponent<Rigidbody>();
             
             _stuckMonitor = GetComponent<StuckMonitor>();
+            if (_stuckMonitor != null)
+            {
+                _stuckMonitor.OnSoftStuck += HandleSoftStuck;
+                _stuckMonitor.OnMediumStuck += HandleMediumStuck;
+            }
             
             // Configuración física crítica para evitar comportamientos raros
             _rb.isKinematic = true; // Nos movemos por script, no por gravedad/física pura
@@ -41,6 +47,41 @@ namespace Homebound.Features.Navigation
             {
                 ApplyGravity();
             }
+            else
+            {
+                // Solo verificamos atascos si se supone que nos estamos moviendo
+                if (_stuckMonitor != null)
+                {
+                    _stuckMonitor.CheckStuck(Time.deltaTime);
+                }
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_stuckMonitor != null)
+            {
+                _stuckMonitor.OnSoftStuck -= HandleSoftStuck;
+                _stuckMonitor.OnMediumStuck -= HandleMediumStuck;
+            }
+        }
+
+        // --- MANEJO DE ATASCOS (Graduated Response) ---
+
+        private void HandleSoftStuck()
+        {
+            // Tier 1: Pequeño empujón aleatorio para salir de esquinas/colliders
+            Vector3 randomNudge = UnityEngine.Random.insideUnitSphere * 0.2f;
+            randomNudge.y = 0; // Mantener plano
+            transform.position += randomNudge;
+            // Debug.Log($"[Movement] Soft Stuck detected. Nudging.");
+        }
+
+        private void HandleMediumStuck()
+        {
+            // Tier 2: Repath silencioso
+            Debug.Log($"[Movement] Medium Stuck detected. Requesting Repath to {_currentDestination}");
+            MoveTo(_currentDestination);
         }
         
         private void ApplyGravity()
@@ -75,10 +116,13 @@ namespace Homebound.Features.Navigation
             if (_pathfindingService == null) _pathfindingService = ServiceLocator.Get<PathfindingService>();
             if (_pathfindingService == null) return;
 
+            _currentDestination = targetPosition;
+
             List<Vector3> path = _pathfindingService.FindPath(transform.position, targetPosition);
             if (path != null && path.Count > 0)
             {
                 StopMoving();
+                if (_stuckMonitor != null) _stuckMonitor.ResetMonitor();
                 _moveCoroutine = StartCoroutine(FollowPath(path));
             }
             else
